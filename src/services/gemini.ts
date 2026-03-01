@@ -83,12 +83,13 @@ export async function analyzeSong(input: { type: 'url' | 'file', value: string, 
     }
   }
 
+  const hasTools = (input as any).type === 'url';
   const result = await genAI.models.generateContent({
     model,
     contents: contents,
     config: {
-      tools: (input as any).type === 'url' ? [{ googleSearch: {} }] : undefined,
-      responseMimeType: "application/json",
+      tools: hasTools ? [{ googleSearch: {} }] : undefined,
+      responseMimeType: hasTools ? undefined : "application/json",
     },
   });
   
@@ -143,12 +144,13 @@ export async function identifySong(input: { type: 'url' | 'file', value: string,
     };
   }
 
+  const hasTools = (input as any).type === 'url';
   const result = await genAI.models.generateContent({
     model,
     contents: contents,
     config: {
-      tools: (input as any).type === 'url' ? [{ googleSearch: {} }] : undefined,
-      responseMimeType: "application/json",
+      tools: hasTools ? [{ googleSearch: {} }] : undefined,
+      responseMimeType: hasTools ? undefined : "application/json",
     },
   });
   
