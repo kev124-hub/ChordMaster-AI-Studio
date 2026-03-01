@@ -1,0 +1,5 @@
+{
+  "name": "ChordMaster AI",
+  "description": "Extract guitar chords, strumming patterns, and lyrics from YouTube URLs or MP3 files.",
+  "requestFramePermissions": []
+}
