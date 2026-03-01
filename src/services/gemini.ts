@@ -27,6 +27,7 @@ export interface SongAnalysis {
     major: string[];
     minor: string[];
   };
+  performanceNotes?: string;
 }
 
 function cleanJsonResponse(text: string) {
@@ -62,6 +63,7 @@ export async function analyzeSong(input: { type: 'url' | 'file', value: string, 
     7. List the diatonic chords for the identified key (Major: I, IV, V; Minor: ii, iii, vi).
     8. Specify capo position (e.g., "Capo 2nd fret" or "No capo").
     9. Approximate song duration in seconds.
+    10. Detailed performance notes including rhythmic guides, feel, and specific chord-beat indications.
   `;
 
   let prompt: string;
@@ -73,15 +75,22 @@ FORMAT: {"title": "", "artist": "", "chords": [], "fingerings": []}
 CONTENT: ${input}`;
     contents = [{ parts: [{ text: prompt }] }];
   } else {
-    const content = input.type === 'url' ? `Analyze this song from the URL: ${input.value}` : 'Analyze the attached audio file';
+    let content = input.type === 'url' ? `Analyze this song from the URL: ${input.value}` : 'Analyze the attached audio file';
+    
+    if (knownDetails?.title && knownDetails?.artist) {
+      content += `\n\nCRITICAL CONTEXT: This song has been identified as "${knownDetails.title}" by "${knownDetails.artist}". 
+      You MUST perform the analysis (lyrics, chords, key, tempo) for THIS SPECIFIC song. 
+      If the URL content seems to be a different song, ignore the URL's audio/metadata and use Google Search to find the correct chords and lyrics for "${knownDetails.title}" by "${knownDetails.artist}".`;
+    }
+
     prompt = `INSTRUCTION: You are a professional musicologist and transcription engine. 
 Output ONLY a valid JSON object. Do not include any conversational text.
-If you cannot access a URL, use Google Search to find the song's chords and lyrics based on the URL metadata.
+If you cannot access a URL, use Google Search to find the song's chords and lyrics based on the URL metadata or the provided song details.
 
 REQUIRED JSON STRUCTURE:
 {
-  "title": "Song Title",
-  "artist": "Artist Name",
+  "title": "${knownDetails?.title || "Song Title"}",
+  "artist": "${knownDetails?.artist || "Artist Name"}",
   "chords": ["Chord1", "Chord2"],
   "fingerings": [{"chord": "C", "strings": ["x", "3", "2", "0", "1", "0"]}],
   "lyrics": "Lyrics with chords...",
@@ -95,7 +104,8 @@ REQUIRED JSON STRUCTURE:
   "keyChords": {
     "major": ["I", "IV", "V"],
     "minor": ["ii", "iii", "vi"]
-  }
+  },
+  "performanceNotes": "Assumed common country/rock strumming... intro pattern 'I I G | D I Am | I C II' suggests rhythmic guide..."
 }
 
 ${frontendInstructions}

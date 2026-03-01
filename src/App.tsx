@@ -57,7 +57,7 @@ const GlassCard = ({ children, className = "" }: { children: React.ReactNode, cl
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className={`bg-white/40 backdrop-blur-2xl border border-white/20 rounded-[2.5rem] p-8 md:p-12 shadow-2xl ${className}`}
+    className={`bg-white/60 backdrop-blur-3xl border border-white/40 rounded-[2.5rem] p-8 md:p-12 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.15)] ${className}`}
   >
     {children}
   </motion.div>
@@ -470,13 +470,13 @@ export default function App() {
             <>
               {/* Input Section */}
               {!result && !pendingSong && !isAnalyzing && (
-                <div className="grid lg:grid-cols-12 gap-8">
-                  <GlassCard className="lg:col-span-12">
-                    <div className="grid md:grid-cols-2 gap-16">
+                <div className="max-w-4xl mx-auto w-full">
+                  <GlassCard className="w-full">
+                    <div className="flex flex-col gap-12">
                       {/* Music Service Input */}
                       <div className="space-y-6">
                         <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-3">
+                          <label className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 flex items-center gap-3">
                             <Music size={18} className="text-[#F27D26]" /> Music URL
                           </label>
                           <Info size={14} className="text-zinc-600 cursor-help" />
@@ -487,23 +487,32 @@ export default function App() {
                             placeholder="Paste YouTube or Spotify link..."
                             value={url}
                             onChange={(e) => { setUrl(e.target.value); setFile(null); }}
-                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 focus:border-[#F27D26]/50 transition-all placeholder:text-zinc-600"
+                            className="w-full bg-white/40 border-2 border-white/60 rounded-2xl px-8 py-6 text-base text-zinc-900 focus:outline-none focus:ring-4 focus:ring-[#F27D26]/20 focus:border-[#F27D26]/40 transition-all placeholder:text-zinc-500 shadow-sm"
                           />
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Youtube size={20} className="text-zinc-600" />
+                          <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-40 group-hover:opacity-100 transition-opacity">
+                            <Youtube size={24} className="text-zinc-600" />
                           </div>
                         </div>
-                        <p className="text-[10px] text-zinc-600 font-medium">Supports YouTube, Spotify, and Apple Music</p>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest ml-1">Supports YouTube, Spotify, and Apple Music</p>
+                      </div>
+
+                      <div className="relative py-4">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-black/5"></div>
+                        </div>
+                        <div className="relative flex justify-center">
+                          <span className="bg-white/20 backdrop-blur-md px-4 text-[10px] font-black text-zinc-400 uppercase tracking-[0.5em]">OR</span>
+                        </div>
                       </div>
 
                       {/* File Input */}
                       <div className="space-y-6">
-                        <label className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-3">
-                          <FileAudio size={18} className="text-teal-500" /> Local Upload
+                        <label className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 flex items-center gap-3">
+                          <FileAudio size={18} className="text-teal-600" /> Local Upload
                         </label>
                         <div 
                           onClick={() => fileInputRef.current?.click()}
-                          className={`border-2 border-dashed rounded-3xl p-6 flex items-center justify-center cursor-pointer transition-all h-[64px] ${file ? 'border-[#F27D26] bg-[#F27D26]/5' : 'border-white/10 hover:border-white/20 bg-white/5'}`}
+                          className={`border-2 border-dashed rounded-3xl p-8 flex items-center justify-center cursor-pointer transition-all min-h-[100px] ${file ? 'border-[#F27D26] bg-[#F27D26]/5' : 'border-white/60 hover:border-[#F27D26]/40 bg-white/40 shadow-sm'}`}
                         >
                           <input
                             type="file"
@@ -512,20 +521,23 @@ export default function App() {
                             accept="audio/*,video/*,application/pdf"
                             className="hidden"
                           />
-                          <div className="flex items-center gap-4 w-full px-4">
+                          <div className="flex items-center gap-6 w-full px-4">
                             {file ? (
                               <>
-                                {file.type === 'application/pdf' ? <FileText size={20} className="text-red-400 shrink-0" /> : <FileAudio size={20} className="text-[#F27D26] shrink-0" />}
-                                <span className="text-sm font-bold text-zinc-900 truncate flex-1">{file.name}</span>
-                                <button onClick={(e) => { e.stopPropagation(); setFile(null); setManualTitle(''); setManualArtist(''); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="p-1 hover:bg-white/10 rounded-full transition-colors shrink-0">
-                                  <Trash2 size={14} className="text-zinc-500" />
+                                {file.type === 'application/pdf' ? <FileText size={28} className="text-red-500 shrink-0" /> : <FileAudio size={28} className="text-[#F27D26] shrink-0" />}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-black text-zinc-900 truncate">{file.name}</p>
+                                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                </div>
+                                <button onClick={(e) => { e.stopPropagation(); setFile(null); setManualTitle(''); setManualArtist(''); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="p-2 hover:bg-black/5 rounded-full transition-colors shrink-0">
+                                  <Trash2 size={18} className="text-zinc-500" />
                                 </button>
                               </>
                             ) : (
-                              <>
-                                <Download size={20} className="text-zinc-500" />
-                                <span className="text-sm font-bold text-zinc-500">Audio, Video, or PDF</span>
-                              </>
+                              <div className="flex flex-col items-center gap-3 w-full py-4">
+                                <Download size={32} className="text-zinc-400" />
+                                <span className="text-xs font-black text-zinc-500 uppercase tracking-widest">Drop Audio, Video, or PDF here</span>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -534,26 +546,26 @@ export default function App() {
                           <motion.div 
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="grid grid-cols-2 gap-4 pt-2"
+                            className="grid grid-cols-2 gap-6 pt-4"
                           >
                             <div className="space-y-2">
-                              <label className="text-[8px] font-black uppercase tracking-widest text-zinc-600 ml-1">Song Title</label>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-1">Song Title</label>
                               <input
                                 type="text"
                                 placeholder="e.g. Let It Be"
                                 value={manualTitle}
                                 onChange={(e) => setManualTitle(e.target.value)}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+                                className="w-full bg-white/40 border-2 border-white/60 rounded-2xl px-6 py-4 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-[#F27D26]/20 transition-all"
                               />
                             </div>
                             <div className="space-y-2">
-                              <label className="text-[8px] font-black uppercase tracking-widest text-zinc-600 ml-1">Artist</label>
+                              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-1">Artist</label>
                               <input
                                 type="text"
                                 placeholder="e.g. The Beatles"
                                 value={manualArtist}
                                 onChange={(e) => setManualArtist(e.target.value)}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+                                className="w-full bg-white/40 border-2 border-white/60 rounded-2xl px-6 py-4 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-[#F27D26]/20 transition-all"
                               />
                             </div>
                           </motion.div>
@@ -561,25 +573,25 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="mt-16 pt-12 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-8">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-teal-500/10 rounded-2xl">
-                          <Play size={24} className="text-teal-500" />
+                    <div className="mt-16 pt-12 border-t border-black/5 flex flex-col md:flex-row items-center justify-between gap-8">
+                      <div className="flex items-center gap-6">
+                        <div className="p-4 bg-teal-500/10 rounded-2xl">
+                          <Play size={32} className="text-teal-600" />
                         </div>
                         <div>
-                          <p className="text-sm font-black text-zinc-900">Ready to Process</p>
-                          <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Step 1: Identify & Extract</p>
+                          <p className="text-base font-black text-zinc-900">Ready to Process</p>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em]">Step 1: Identify & Extract</p>
                         </div>
                       </div>
                       
                       <button
                         onClick={handleStart}
                         disabled={isIdentifying || isAnalyzing || (!url && !file)}
-                        className="group flex items-center gap-4 bg-[#F27D26] hover:bg-[#FF8C37] disabled:bg-zinc-800 disabled:text-zinc-600 px-10 py-5 rounded-2xl text-xs font-black uppercase tracking-[0.3em] text-white transition-all shadow-2xl shadow-[#F27D26]/20 active:scale-95"
+                        className="group flex items-center gap-4 bg-[#F27D26] hover:bg-[#FF8C37] disabled:bg-zinc-800 disabled:text-zinc-600 px-12 py-6 rounded-2xl text-xs font-black uppercase tracking-[0.3em] text-white transition-all shadow-[0_20px_40px_-12px_rgba(242,125,38,0.4)] active:scale-95"
                       >
-                        {isIdentifying ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} fill="white" />}
+                        {isIdentifying ? <Loader2 size={20} className="animate-spin" /> : <Play size={20} fill="white" />}
                         {isIdentifying ? 'Identifying...' : file ? 'Start Analysis' : 'Identify Track'}
-                        <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                        <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
                       </button>
                     </div>
                   </GlassCard>
@@ -797,6 +809,17 @@ export default function App() {
                             ))}
                           </div>
                         </GlassCard>
+
+                        {result.performanceNotes && (
+                          <GlassCard>
+                            <h3 className="text-2xl font-black text-zinc-900 tracking-tight mb-6">Performance Notes</h3>
+                            <div className="p-6 bg-black/5 rounded-2xl border border-black/5">
+                              <p className="text-sm font-medium text-zinc-700 leading-relaxed italic">
+                                "{result.performanceNotes}"
+                              </p>
+                            </div>
+                          </GlassCard>
+                        )}
                       </div>
                     </div>
                   </motion.div>
