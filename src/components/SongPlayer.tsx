@@ -40,7 +40,7 @@ const ChordDiagram = ({ fingering, theme }: { fingering: any, theme: string }) =
           if (lowerVal === 'x') return <text key={sIndex} x={x} y="15" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#EF4444">X</text>;
           if (lowerVal === '0') return <circle key={sIndex} cx={x} cy="12" r="3" fill="none" stroke={strokeColor} strokeWidth="1" strokeOpacity="0.5" />;
           const fret = parseInt(val);
-          if (!isNaN(fret) && fret > 0) return <circle key={sIndex} cx={x} cy={20 + (fret - 0.5) * 16} r="5" fill="#F27D26" />;
+          if (!isNaN(fret) && fret > 0) return <circle key={sIndex} cx={x} cy={20 + (fret - 0.5) * 16} r="5" fill="#D96611" />;
           return null;
         })}
       </svg>
@@ -189,7 +189,7 @@ export const SongPlayer: React.FC<SongPlayerProps> = ({
         <div className="flex items-center gap-2">
           <button 
             onClick={() => setShowSettings(!showSettings)}
-            className={`p-3 rounded-2xl transition-all border ${showSettings ? 'bg-[#F27D26] border-[#F27D26] text-white shadow-xl shadow-[#F27D26]/20' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`p-3 rounded-2xl transition-all border ${showSettings ? 'bg-[#D96611] border-[#D96611] text-white shadow-xl shadow-[#D96611]/20' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
           >
             <Settings size={20} />
           </button>
@@ -207,7 +207,7 @@ export const SongPlayer: React.FC<SongPlayerProps> = ({
               <div className="space-y-0.5">
                 <p className="text-[7px] font-black uppercase tracking-widest text-zinc-500">Tempo</p>
                 <div className="flex items-center gap-1.5">
-                  <Activity size={12} className="text-[#F27D26]" />
+                  <Activity size={12} className="text-[#D96611]" />
                   <span className="text-xs font-black">
                     {song.tempo?.replace(/\s*BPM\s*/gi, '') || '120'} BPM
                   </span>
@@ -255,7 +255,7 @@ export const SongPlayer: React.FC<SongPlayerProps> = ({
               <div className="flex items-center gap-2">
                 <Info size={14} className="text-amber-400" />
                 <span className="text-[10px] font-bold text-zinc-300 line-clamp-2 italic">
-                  {song.lines.find(l => l.type === 'comment')?.content || 'No specific notes'}
+                  {song.performanceNotes || 'No specific notes'}
                 </span>
               </div>
             </div>
@@ -287,7 +287,7 @@ export const SongPlayer: React.FC<SongPlayerProps> = ({
               exit={{ scale: 2, opacity: 0 }}
               className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none"
             >
-              <span className="text-[12rem] font-black text-[#F27D26] drop-shadow-2xl">{countdown}</span>
+              <span className="text-[12rem] font-black text-[#D96611] drop-shadow-2xl">{countdown}</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -298,7 +298,7 @@ export const SongPlayer: React.FC<SongPlayerProps> = ({
             if (line.type === 'directive') return null;
             if (line.type === 'comment' && settings.viewer.showPerformanceNotes) {
               return (
-                <div key={idx} className="py-3 px-6 bg-white/5 border-l-4 border-[#F27D26] rounded-r-2xl italic opacity-80 text-sm">
+                <div key={idx} className="py-3 px-6 bg-white/5 border-l-4 border-[#D96611] rounded-r-2xl italic opacity-80 text-sm">
                   {line.content}
                 </div>
               );
@@ -342,7 +342,7 @@ export const SongPlayer: React.FC<SongPlayerProps> = ({
             className="absolute bottom-32 right-4 md:right-8 w-80 bg-zinc-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl z-50 text-white"
           >
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#F27D26]">Quick Settings</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#D96611]">Quick Settings</h3>
               <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                 <X size={16} />
               </button>
@@ -370,7 +370,7 @@ export const SongPlayer: React.FC<SongPlayerProps> = ({
                       key={t}
                       onClick={() => setTheme(t)}
                       className={`py-3 rounded-xl text-[10px] font-black uppercase border transition-all ${
-                        theme === t ? 'bg-[#F27D26] border-[#F27D26]' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                        theme === t ? 'bg-[#D96611] border-[#D96611]' : 'bg-white/5 border-white/10 hover:bg-white/10'
                       }`}
                     >
                       {t}
@@ -400,7 +400,7 @@ export const SongPlayer: React.FC<SongPlayerProps> = ({
                    }
                  }}>
               <div 
-                className="absolute inset-y-0 left-0 bg-[#F27D26] transition-all duration-100"
+                className="absolute inset-y-0 left-0 bg-[#D96611] transition-all duration-100"
                 style={{ width: `${progress * 100}%` }}
               />
             </div>
@@ -415,7 +415,7 @@ export const SongPlayer: React.FC<SongPlayerProps> = ({
                 step="10"
                 value={duration}
                 onChange={(e) => setDuration(Number(e.target.value))}
-                className="w-24 accent-[#F27D26]"
+                className="w-24 accent-[#D96611]"
               />
               <span className="text-xs font-black tabular-nums w-12">
                 {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')}
@@ -433,7 +433,7 @@ export const SongPlayer: React.FC<SongPlayerProps> = ({
               </button>
               <button 
                 onClick={handlePlayPause}
-                className="w-14 h-14 bg-[#F27D26] hover:bg-[#FF8C37] rounded-full flex items-center justify-center shadow-2xl shadow-[#F27D26]/30 transition-all active:scale-95"
+                className="w-14 h-14 bg-[#D96611] hover:bg-[#FF8C37] rounded-full flex items-center justify-center shadow-2xl shadow-[#D96611]/30 transition-all active:scale-95"
               >
                 {isPlaying ? <Pause size={24} fill="white" /> : <Play size={24} fill="white" className="ml-1" />}
               </button>

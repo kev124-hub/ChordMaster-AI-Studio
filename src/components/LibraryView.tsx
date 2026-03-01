@@ -28,7 +28,7 @@ interface LibraryViewProps {
 }
 
 const GlassCard = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => (
-  <div className={`bg-white/40 backdrop-blur-2xl border border-white/20 rounded-[2.5rem] p-8 shadow-2xl ${className}`}>
+  <div className={`bg-white/40 backdrop-blur-2xl border border-white/20 rounded-[2rem] md:rounded-[2.5rem] p-5 md:p-8 shadow-2xl ${className}`}>
     {children}
   </div>
 );
@@ -77,7 +77,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
       { key: 'capo', value: updatedSong.analysis.capo },
       { key: 'tuning', value: updatedSong.analysis.tuning },
       { key: 'duration', value: updatedSong.analysis.duration?.toString() },
-      { key: 'time', value: updatedSong.analysis.timeSignature }
+      { key: 'time', value: updatedSong.analysis.timeSignature },
+      { key: 'performance-notes', value: updatedSong.analysis.performanceNotes }
     ];
 
     tags.forEach(({ key, value }) => {
@@ -129,7 +130,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
             </div>
             <button 
               onClick={() => saveEdit(editingSong)}
-              className="flex items-center gap-3 bg-[#F27D26] hover:bg-[#FF8C37] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-2xl shadow-[#F27D26]/20"
+              className="flex items-center gap-3 bg-[#D96611] hover:bg-[#FF8C37] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-2xl shadow-[#D96611]/20"
             >
               <Save size={16} />
               Save Changes
@@ -138,7 +139,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <GlassCard className="space-y-6">
-              <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#F27D26]">Metadata</h2>
+              <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#D96611]">Metadata</h2>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Title</label>
@@ -146,7 +147,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                     type="text"
                     value={editingSong.analysis.title}
                     onChange={(e) => setEditingSong({ ...editingSong, analysis: { ...editingSong.analysis, title: e.target.value } })}
-                    className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+                    className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
                   />
                 </div>
                 <div className="space-y-2">
@@ -155,7 +156,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                     type="text"
                     value={editingSong.analysis.artist}
                     onChange={(e) => setEditingSong({ ...editingSong, analysis: { ...editingSong.analysis, artist: e.target.value } })}
-                    className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+                    className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -165,7 +166,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                       type="text"
                       value={editingSong.analysis.key}
                       onChange={(e) => setEditingSong({ ...editingSong, analysis: { ...editingSong.analysis, key: e.target.value } })}
-                      className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+                      className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
                     />
                   </div>
                   <div className="space-y-2">
@@ -174,7 +175,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                       type="text"
                       value={editingSong.analysis.tempo}
                       onChange={(e) => setEditingSong({ ...editingSong, analysis: { ...editingSong.analysis, tempo: e.target.value } })}
-                      className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+                      className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
                     />
                   </div>
                 </div>
@@ -185,7 +186,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                       type="text"
                       value={editingSong.analysis.capo}
                       onChange={(e) => setEditingSong({ ...editingSong, analysis: { ...editingSong.analysis, capo: e.target.value } })}
-                      className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+                      className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
                     />
                   </div>
                   <div className="space-y-2">
@@ -194,7 +195,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                       type="text"
                       value={editingSong.analysis.tuning}
                       onChange={(e) => setEditingSong({ ...editingSong, analysis: { ...editingSong.analysis, tuning: e.target.value } })}
-                      className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+                      className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
                     />
                   </div>
                 </div>
@@ -204,7 +205,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                     type="text"
                     value={editingSong.analysis.strummingPattern}
                     onChange={(e) => setEditingSong({ ...editingSong, analysis: { ...editingSong.analysis, strummingPattern: e.target.value } })}
-                    className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+                    className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Performance Notes</label>
+                  <textarea 
+                    value={editingSong.analysis.performanceNotes}
+                    onChange={(e) => setEditingSong({ ...editingSong, analysis: { ...editingSong.analysis, performanceNotes: e.target.value } })}
+                    className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all h-24 resize-none"
                   />
                 </div>
                 <div className="space-y-2">
@@ -213,7 +222,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                     type="number"
                     value={editingSong.analysis.duration || 180}
                     onChange={(e) => setEditingSong({ ...editingSong, analysis: { ...editingSong.analysis, duration: parseInt(e.target.value) } })}
-                    className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+                    className="w-full bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
                   />
                   <p className="text-[10px] text-zinc-500 italic">Used for autoscroll speed calculation</p>
                 </div>
@@ -221,11 +230,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
             </GlassCard>
 
             <GlassCard className="space-y-6">
-              <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#F27D26]">Lyrics & Chords (ChordPro)</h2>
+              <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#D96611]">Lyrics & Chords (ChordPro)</h2>
               <textarea 
                 value={editingSong.chordPro}
                 onChange={(e) => setEditingSong({ ...editingSong, chordPro: e.target.value })}
-                className="w-full h-[500px] bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all resize-none"
+                className="w-full h-[500px] bg-black/5 border border-black/10 rounded-2xl px-6 py-4 text-zinc-900 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all resize-none"
               />
             </GlassCard>
           </div>
@@ -252,7 +261,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
           <div className="space-y-8">
             {/* Display Settings */}
             <section className="space-y-6">
-              <div className="flex items-center gap-3 text-[#F27D26]">
+              <div className="flex items-center gap-3 text-[#D96611]">
                 <Type size={20} />
                 <h2 className="text-[10px] font-black uppercase tracking-[0.3em]">Display Settings</h2>
               </div>
@@ -275,7 +284,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Base Font Size</label>
-                    <span className="text-[10px] font-black text-[#F27D26] bg-[#F27D26]/10 px-2 py-1 rounded">{settings.display.baseFontSize}px</span>
+                    <span className="text-[10px] font-black text-[#D96611] bg-[#D96611]/10 px-2 py-1 rounded">{settings.display.baseFontSize}px</span>
                   </div>
                   <input 
                     type="range" 
@@ -283,7 +292,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                     max="24" 
                     value={settings.display.baseFontSize}
                     onChange={(e) => onUpdateSettings({ ...settings, display: { ...settings.display, baseFontSize: parseInt(e.target.value) } })}
-                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#F27D26]"
+                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#D96611]"
                   />
                 </div>
 
@@ -439,9 +448,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
           <div className="space-y-4">
-            <h1 className="text-6xl font-black tracking-tighter text-zinc-900">Library</h1>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-zinc-900">Library</h1>
             <div className="flex items-center gap-4">
-              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-[#F27D26]">{songs.length} Transcriptions</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-[#8C400B]">{songs.length} Transcriptions</span>
               <div className="w-1 h-1 rounded-full bg-zinc-400" />
               <button 
                 onClick={() => setSubView('settings')}
@@ -455,13 +464,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
           
           <div className="flex items-center gap-4">
             <div className="relative group">
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#F27D26] transition-colors" size={18} />
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#D96611] transition-colors" size={18} />
               <input 
                 type="text"
                 placeholder="Search your collection..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-black/10 border border-black/10 rounded-[2rem] py-4 pl-14 pr-6 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 focus:bg-black/20 transition-all placeholder:text-zinc-600 text-zinc-900"
+                className="bg-black/10 border border-black/10 rounded-[2rem] py-4 pl-14 pr-6 text-sm w-80 focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 focus:bg-black/20 transition-all placeholder:text-zinc-600 text-zinc-900"
               />
             </div>
           </div>
@@ -472,7 +481,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
           <button 
             onClick={() => setFilter('all')}
             className={`px-10 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
-              filter === 'all' ? 'bg-[#F27D26] text-white shadow-xl shadow-[#F27D26]/20' : 'text-zinc-600 hover:text-zinc-900 hover:bg-black/5'
+              filter === 'all' ? 'bg-[#D96611] text-white shadow-xl shadow-[#D96611]/20' : 'text-zinc-600 hover:text-zinc-900 hover:bg-black/5'
             }`}
           >
             All Songs
@@ -480,7 +489,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
           <button 
             onClick={() => setFilter('favorites')}
             className={`px-10 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
-              filter === 'favorites' ? 'bg-[#F27D26] text-white shadow-xl shadow-[#F27D26]/20' : 'text-zinc-600 hover:text-zinc-900 hover:bg-black/5'
+              filter === 'favorites' ? 'bg-[#D96611] text-white shadow-xl shadow-[#D96611]/20' : 'text-zinc-600 hover:text-zinc-900 hover:bg-black/5'
             }`}
           >
             Favorites
@@ -500,62 +509,62 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                   key={song.id}
                   className="group relative"
                 >
-                  <GlassCard className="hover:border-[#F27D26]/30 transition-all duration-500 group-hover:translate-y-[-4px] bg-white/40 border-white/20">
-                    <div className="flex justify-between items-start mb-10">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3">
-                          <span className="px-2 py-0.5 bg-black/5 text-zinc-600 rounded text-[8px] font-black uppercase tracking-widest">
+                  <GlassCard className="hover:border-[#D96611]/30 transition-all duration-500 group-hover:translate-y-[-4px] bg-white/40 border-white/20">
+                    <div className="flex justify-between items-start mb-4 md:mb-8">
+                      <div className="space-y-1 md:space-y-2 flex-1 min-w-0 pr-4">
+                        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                          <span className="px-1.5 py-0.5 bg-black/5 text-zinc-600 rounded text-[7px] md:text-[8px] font-black uppercase tracking-widest">
                             {song.analysis.key || 'N/A'}
                           </span>
-                          <span className="px-2 py-0.5 bg-black/5 text-zinc-600 rounded text-[8px] font-black uppercase tracking-widest">
+                          <span className="px-1.5 py-0.5 bg-black/5 text-zinc-600 rounded text-[7px] md:text-[8px] font-black uppercase tracking-widest">
                             {song.analysis.tempo || 'N/A'}
                           </span>
-                          <span className="px-2 py-0.5 bg-black/5 text-zinc-600 rounded text-[8px] font-black uppercase tracking-widest">
+                          <span className="px-1.5 py-0.5 bg-black/5 text-zinc-600 rounded text-[7px] md:text-[8px] font-black uppercase tracking-widest">
                             {song.analysis.strummingPattern || 'N/A'}
                           </span>
                         </div>
-                        <h3 className="text-3xl font-black tracking-tight text-zinc-900 group-hover:text-[#F27D26] transition-colors leading-tight">
+                        <h3 className="text-xl md:text-3xl font-black tracking-tight text-zinc-900 group-hover:text-[#D96611] transition-colors leading-tight truncate">
                           {song.analysis.title}
                         </h3>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">
+                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-zinc-600 truncate">
                           {song.analysis.artist}
                         </p>
                       </div>
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-1.5 md:gap-2 shrink-0">
                         <button 
                           onClick={() => toggleFavorite(song.id)}
-                          className={`p-3 rounded-2xl transition-all border ${song.isFavorite ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500' : 'bg-white/5 border-white/10 text-zinc-600 hover:text-white hover:bg-white/10'}`}
+                          className={`p-2 md:p-3 rounded-xl md:rounded-2xl transition-all border ${song.isFavorite ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500' : 'bg-white/5 border-white/10 text-zinc-600 hover:text-white hover:bg-white/10'}`}
                         >
-                          <Star size={18} fill={song.isFavorite ? 'currentColor' : 'none'} />
+                          <Star size={16} className="md:w-[18px] md:h-[18px]" fill={song.isFavorite ? 'currentColor' : 'none'} />
                         </button>
                         <button 
                           onClick={() => handleEdit(song)}
-                          className="p-3 bg-white/5 border border-white/10 text-zinc-600 hover:text-[#F27D26] hover:bg-[#F27D26]/10 hover:border-[#F27D26]/20 rounded-2xl transition-all"
+                          className="p-2 md:p-3 bg-white/5 border border-white/10 text-zinc-600 hover:text-[#D96611] hover:bg-[#D96611]/10 hover:border-[#D96611]/20 rounded-xl md:rounded-2xl transition-all"
                         >
-                          <Edit2 size={18} />
+                          <Edit2 size={16} className="md:w-[18px] md:h-[18px]" />
                         </button>
                         <button 
                           onClick={() => deleteSong(song.id)}
-                          className="p-3 bg-white/5 border border-white/10 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 hover:border-red-500/20 rounded-2xl transition-all"
+                          className="p-2 md:p-3 bg-white/5 border border-white/10 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 hover:border-red-500/20 rounded-xl md:rounded-2xl transition-all"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={16} className="md:w-[18px] md:h-[18px]" />
                         </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-8 border-t border-black/5">
-                      <div className="flex items-center gap-3 text-zinc-600">
-                        <Clock size={14} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">
+                    <div className="flex items-center justify-between pt-4 md:pt-6 border-t border-black/5">
+                      <div className="flex items-center gap-2 md:gap-3 text-zinc-600">
+                        <Clock size={12} className="md:w-3.5 md:h-3.5" />
+                        <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest">
                           {new Date(song.savedAt).toLocaleDateString()}
                         </span>
                       </div>
                       
                       <button 
                         onClick={() => onPlay(song.chordPro, song.analysis.title)}
-                        className="flex items-center gap-4 bg-black/5 hover:bg-[#F27D26] text-zinc-900 hover:text-white px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] transition-all border border-black/10 hover:border-transparent shadow-xl active:scale-95"
+                        className="flex items-center gap-2 md:gap-4 bg-black/5 hover:bg-[#D96611] text-zinc-900 hover:text-white px-4 py-2.5 md:px-10 md:py-4 rounded-xl md:rounded-2xl text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] transition-all border border-black/10 hover:border-transparent shadow-xl active:scale-95"
                       >
-                        <Play size={14} fill="currentColor" />
+                        <Play size={12} className="md:w-3.5 md:h-3.5" fill="currentColor" />
                         Perform
                       </button>
                     </div>
@@ -575,7 +584,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                 </div>
                 <button 
                   onClick={onBack}
-                  className="flex items-center gap-3 bg-[#F27D26] hover:bg-[#FF8C37] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-2xl shadow-[#F27D26]/20"
+                  className="flex items-center gap-3 bg-[#D96611] hover:bg-[#FF8C37] text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-2xl shadow-[#D96611]/20"
                 >
                   <Plus size={16} />
                   New Transcription

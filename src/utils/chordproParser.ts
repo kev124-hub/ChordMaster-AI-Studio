@@ -14,6 +14,7 @@ export interface ChordProSong {
   timeSignature?: string;
   tuning?: string;
   strumming?: string;
+  performanceNotes?: string;
   fingerings?: { chord: string; strings: string[] }[];
   lines: ChordProLine[];
 }
@@ -40,6 +41,7 @@ export function parseChordPro(text: string): ChordProSong {
       else if (k === 'tuning') song.tuning = value;
       else if (k === 'time' || k === 'timesignature') song.timeSignature = value;
       else if (k === 'strumming') song.strumming = value;
+      else if (k === 'performance-notes' || k === 'notes') song.performanceNotes = value;
       else if (k === 'duration') {
         // Handle mm:ss or seconds
         if (value.includes(':')) {

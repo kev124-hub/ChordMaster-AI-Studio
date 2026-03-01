@@ -34,7 +34,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   display: {
     fontFamily: 'Spline Sans (Modern)',
     baseFontSize: 16,
-    chordColor: '#F27D26',
+    chordColor: '#D96611',
     lyricColor: '#F8F8F8',
   },
   scroll: {
@@ -69,7 +69,7 @@ const ChordDiagram = ({ fingering }: { fingering: ChordFingering }) => {
   const strings = fingering.strings;
   
   return (
-    <div className="flex flex-col items-center p-4 bg-white/20 backdrop-blur-md rounded-2xl border border-white/20 shadow-xl w-32 group hover:border-[#F27D26]/30 transition-all">
+    <div className="flex flex-col items-center p-4 bg-white/20 backdrop-blur-md rounded-2xl border border-white/20 shadow-xl w-32 group hover:border-[#D96611]/30 transition-all">
       <span className="text-xs font-black mb-3 text-zinc-700 group-hover:text-zinc-900 transition-colors uppercase tracking-widest">{fingering.chord}</span>
       <svg width="80" height="100" viewBox="0 0 80 100" className="overflow-visible">
         {/* Nut */}
@@ -99,7 +99,7 @@ const ChordDiagram = ({ fingering }: { fingering: ChordFingering }) => {
           if (!isNaN(fret) && fret > 0) {
             return (
               <g key={sIndex}>
-                <circle cx={x} cy={20 + (fret - 0.5) * 16} r="5" fill="#F27D26" className="animate-pulse" />
+                <circle cx={x} cy={20 + (fret - 0.5) * 16} r="5" fill="#D96611" className="animate-pulse" />
                 <circle cx={x} cy={20 + (fret - 0.5) * 16} r="3" fill="white" />
               </g>
             );
@@ -156,7 +156,7 @@ const MissingInfoModal = ({
               type="text" 
               value={data.key || ''} 
               onChange={(e) => setData({ ...data, key: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
               placeholder="e.g. G Major"
             />
           </div>
@@ -166,7 +166,7 @@ const MissingInfoModal = ({
               type="text" 
               value={data.tempo || ''} 
               onChange={(e) => setData({ ...data, tempo: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
               placeholder="e.g. 120"
             />
           </div>
@@ -176,7 +176,7 @@ const MissingInfoModal = ({
               type="text" 
               value={data.strummingPattern || ''} 
               onChange={(e) => setData({ ...data, strummingPattern: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
               placeholder="e.g. D D U U D U"
             />
           </div>
@@ -186,15 +186,24 @@ const MissingInfoModal = ({
               type="number" 
               value={data.duration || ''} 
               onChange={(e) => setData({ ...data, duration: parseInt(e.target.value) })}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:ring-2 focus:ring-[#F27D26]/30 transition-all"
+              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all"
               placeholder="e.g. 180"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Performance Notes</label>
+            <textarea 
+              value={data.performanceNotes || ''} 
+              onChange={(e) => setData({ ...data, performanceNotes: e.target.value })}
+              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:ring-2 focus:ring-[#D96611]/30 transition-all h-24 resize-none"
+              placeholder="e.g. Play with a light touch, focus on the bass notes..."
             />
           </div>
         </div>
 
         <button 
           onClick={() => onSave(data)}
-          className="w-full bg-[#F27D26] hover:bg-[#FF8C37] text-white py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-xs shadow-2xl shadow-[#F27D26]/20 transition-all active:scale-95"
+          className="w-full bg-[#D96611] hover:bg-[#FF8C37] text-white py-5 rounded-2xl font-black uppercase tracking-[0.3em] text-xs shadow-2xl shadow-[#D96611]/20 transition-all active:scale-95"
         >
           Save & Continue
         </button>
@@ -363,11 +372,29 @@ export default function App() {
     setError(null);
     setResult(null);
     setPendingSong(null);
+    setProgress(0);
+
+    // Start progress simulation for identification
+    const totalSeconds = 30; // Identification should be faster
+    let currentProgress = 0;
+    const idInterval = setInterval(() => {
+      let increment = (100 / totalSeconds) / 10;
+      if (currentProgress > 80) {
+        increment *= 0.1; // Slow down significantly after 80%
+      }
+      currentProgress += increment;
+      if (currentProgress < 99) {
+        setProgress(currentProgress);
+      }
+    }, 100);
 
     try {
       const identification = await identifySong({ type: 'url', value: url });
+      clearInterval(idInterval);
+      setProgress(100);
       setPendingSong(identification);
     } catch (err: any) {
+      clearInterval(idInterval);
       setError(err.message || 'Could not identify the song.');
     } finally {
       setIsIdentifying(false);
@@ -410,7 +437,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#929ca3] font-sans text-zinc-900 selection:bg-[#F27D26]/30 overflow-x-hidden">
+    <div className="min-h-screen bg-[#929ca3] font-sans text-zinc-900 selection:bg-[#D96611]/30 overflow-x-hidden">
       {/* Background Orbs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-white/10 blur-[120px] rounded-full" />
@@ -433,10 +460,10 @@ export default function App() {
           <header className="flex items-center justify-between mb-20">
             <div className="flex items-center gap-6">
               <div className="w-16 h-16 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl flex items-center justify-center text-white shadow-2xl rotate-3">
-                <Guitar size={36} className="text-[#F27D26]" />
+                <Guitar size={36} className="text-[#D96611]" />
               </div>
               <div>
-                <h1 className="text-4xl font-black tracking-tighter text-zinc-900">CHORDMASTER <span className="text-[#F27D26]">AI</span></h1>
+                <h1 className="text-4xl font-black tracking-tighter text-zinc-900">CHORDMASTER <span className="text-[#D96611]">AI</span></h1>
                 <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-1">Precision Transcription Engine</p>
               </div>
             </div>
@@ -446,7 +473,7 @@ export default function App() {
                   onClick={() => setView('library')}
                   className="flex items-center gap-3 px-6 py-3 bg-white/20 hover:bg-white/30 text-zinc-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/30 shadow-xl"
                 >
-                  <Library size={16} className="text-[#F27D26]" />
+                  <Library size={16} className="text-[#D96611]" />
                   Library
                 </button>
                 <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
@@ -477,7 +504,7 @@ export default function App() {
                       <div className="space-y-6">
                         <div className="flex items-center justify-between">
                           <label className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 flex items-center gap-3">
-                            <Music size={18} className="text-[#F27D26]" /> Music URL
+                            <Music size={18} className="text-[#D96611]" /> Music URL
                           </label>
                           <Info size={14} className="text-zinc-600 cursor-help" />
                         </div>
@@ -487,7 +514,7 @@ export default function App() {
                             placeholder="Paste YouTube or Spotify link..."
                             value={url}
                             onChange={(e) => { setUrl(e.target.value); setFile(null); }}
-                            className="w-full bg-white/40 border-2 border-white/60 rounded-2xl px-8 py-6 text-base text-zinc-900 focus:outline-none focus:ring-4 focus:ring-[#F27D26]/20 focus:border-[#F27D26]/40 transition-all placeholder:text-zinc-500 shadow-sm"
+                            className="w-full bg-white/40 border-2 border-white/60 rounded-2xl px-8 py-6 text-base text-zinc-900 focus:outline-none focus:ring-4 focus:ring-[#D96611]/20 focus:border-[#D96611]/40 transition-all placeholder:text-zinc-500 shadow-sm"
                           />
                           <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-40 group-hover:opacity-100 transition-opacity">
                             <Youtube size={24} className="text-zinc-600" />
@@ -512,7 +539,7 @@ export default function App() {
                         </label>
                         <div 
                           onClick={() => fileInputRef.current?.click()}
-                          className={`border-2 border-dashed rounded-3xl p-8 flex items-center justify-center cursor-pointer transition-all min-h-[100px] ${file ? 'border-[#F27D26] bg-[#F27D26]/5' : 'border-white/60 hover:border-[#F27D26]/40 bg-white/40 shadow-sm'}`}
+                          className={`border-2 border-dashed rounded-3xl p-8 flex items-center justify-center cursor-pointer transition-all min-h-[100px] ${file ? 'border-[#D96611] bg-[#D96611]/5' : 'border-white/60 hover:border-[#D96611]/40 bg-white/40 shadow-sm'}`}
                         >
                           <input
                             type="file"
@@ -524,7 +551,7 @@ export default function App() {
                           <div className="flex items-center gap-6 w-full px-4">
                             {file ? (
                               <>
-                                {file.type === 'application/pdf' ? <FileText size={28} className="text-red-500 shrink-0" /> : <FileAudio size={28} className="text-[#F27D26] shrink-0" />}
+                                {file.type === 'application/pdf' ? <FileText size={28} className="text-red-500 shrink-0" /> : <FileAudio size={28} className="text-[#D96611] shrink-0" />}
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-black text-zinc-900 truncate">{file.name}</p>
                                   <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
@@ -555,7 +582,7 @@ export default function App() {
                                 placeholder="e.g. Let It Be"
                                 value={manualTitle}
                                 onChange={(e) => setManualTitle(e.target.value)}
-                                className="w-full bg-white/40 border-2 border-white/60 rounded-2xl px-6 py-4 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-[#F27D26]/20 transition-all"
+                                className="w-full bg-white/40 border-2 border-white/60 rounded-2xl px-6 py-4 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-[#D96611]/20 transition-all"
                               />
                             </div>
                             <div className="space-y-2">
@@ -565,7 +592,7 @@ export default function App() {
                                 placeholder="e.g. The Beatles"
                                 value={manualArtist}
                                 onChange={(e) => setManualArtist(e.target.value)}
-                                className="w-full bg-white/40 border-2 border-white/60 rounded-2xl px-6 py-4 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-[#F27D26]/20 transition-all"
+                                className="w-full bg-white/40 border-2 border-white/60 rounded-2xl px-6 py-4 text-sm text-zinc-900 focus:outline-none focus:ring-4 focus:ring-[#D96611]/20 transition-all"
                               />
                             </div>
                           </motion.div>
@@ -587,7 +614,7 @@ export default function App() {
                       <button
                         onClick={handleStart}
                         disabled={isIdentifying || isAnalyzing || (!url && !file)}
-                        className="group flex items-center gap-4 bg-[#F27D26] hover:bg-[#FF8C37] disabled:bg-zinc-800 disabled:text-zinc-600 px-12 py-6 rounded-2xl text-xs font-black uppercase tracking-[0.3em] text-white transition-all shadow-[0_20px_40px_-12px_rgba(242,125,38,0.4)] active:scale-95"
+                        className="group flex items-center gap-4 bg-[#D96611] hover:bg-[#FF8C37] disabled:bg-zinc-800 disabled:text-zinc-600 px-12 py-6 rounded-2xl text-xs font-black uppercase tracking-[0.3em] text-white transition-all shadow-[0_20px_40px_-12px_rgba(217,102,17,0.4)] active:scale-95"
                       >
                         {isIdentifying ? <Loader2 size={20} className="animate-spin" /> : <Play size={20} fill="white" />}
                         {isIdentifying ? 'Identifying...' : file ? 'Start Analysis' : 'Identify Track'}
@@ -603,11 +630,11 @@ export default function App() {
                 <GlassCard>
                   <div className="flex flex-col md:flex-row items-center justify-between gap-12">
                     <div className="flex items-center gap-8">
-                      <div className="w-24 h-24 bg-[#F27D26]/10 rounded-3xl flex items-center justify-center text-[#F27D26] shadow-inner">
+                      <div className="w-24 h-24 bg-[#D96611]/10 rounded-3xl flex items-center justify-center text-[#D96611] shadow-inner">
                         <Music size={48} />
                       </div>
                       <div>
-                        <p className="text-[10px] font-black text-[#F27D26] uppercase tracking-[0.4em] mb-2">Track Identified</p>
+                        <p className="text-[10px] font-black text-[#D96611] uppercase tracking-[0.4em] mb-2">Track Identified</p>
                         <h2 className="text-4xl font-black text-zinc-900 tracking-tight">{pendingSong.title}</h2>
                         <p className="text-lg font-bold text-zinc-600">{pendingSong.artist}</p>
                       </div>
@@ -622,7 +649,7 @@ export default function App() {
                       </button>
                       <button
                         onClick={handleConfirm}
-                        className="flex items-center gap-4 bg-[#F27D26] hover:bg-[#FF8C37] px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] text-white transition-all shadow-2xl shadow-[#F27D26]/20 active:scale-95"
+                        className="flex items-center gap-4 bg-[#D96611] hover:bg-[#FF8C37] px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] text-white transition-all shadow-2xl shadow-[#D96611]/20 active:scale-95"
                       >
                         Start Transcription
                         <ChevronRight size={16} />
@@ -632,42 +659,65 @@ export default function App() {
                 </GlassCard>
               )}
 
-              {/* Analysis Progress */}
-              {isAnalyzing && (
+              {/* Analysis/Identification Progress */}
+              {(isAnalyzing || isIdentifying) && (
                 <GlassCard>
                   <div className="max-w-2xl mx-auto py-12 space-y-12">
                     <div className="text-center space-y-4">
-                      <div className="inline-flex p-6 bg-[#F27D26]/10 rounded-full animate-pulse mb-4">
-                        <Loader2 size={48} className="text-[#F27D26] animate-spin" />
+                      <div className="inline-flex p-6 bg-[#D96611]/10 rounded-full animate-pulse mb-4">
+                        <Loader2 size={48} className="text-[#D96611] animate-spin" />
                       </div>
-                      <h2 className="text-4xl font-black text-zinc-900 tracking-tight">Transcribing Audio</h2>
-                      <p className="text-zinc-600 font-bold uppercase tracking-[0.2em] text-xs">AI is mapping harmonic structure & lyrics</p>
+                      <h2 className="text-4xl font-black text-zinc-900 tracking-tight">
+                        {isIdentifying ? 'Identifying Track' : 'Transcribing Audio'}
+                      </h2>
+                      <p className="text-zinc-600 font-bold uppercase tracking-[0.2em] text-xs">
+                        {isIdentifying 
+                          ? 'AI is searching for song metadata...' 
+                          : 'AI is mapping harmonic structure & lyrics'}
+                      </p>
                     </div>
                     
                     <div className="space-y-4">
                       <div className="h-4 bg-black/5 rounded-full overflow-hidden border border-black/10 p-1">
                         <motion.div 
-                          className="h-full bg-gradient-to-r from-[#F27D26] to-orange-400 rounded-full shadow-[0_0_20px_rgba(249,115,22,0.4)]"
+                          className="h-full bg-gradient-to-r from-[#D96611] to-orange-400 rounded-full shadow-[0_0_20px_rgba(249,115,22,0.4)]"
                           initial={{ width: 0 }}
                           animate={{ width: `${progress}%` }}
                         />
                       </div>
                       <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                        <span>Processing...</span>
+                        <span>{isIdentifying ? 'Searching...' : 'Processing...'}</span>
                         <span>{Math.round(progress)}%</span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      {['Isolating Tracks', 'Detecting Chords', 'Syncing Lyrics'].map((step, i) => (
-                        <div key={step} className={`p-4 rounded-2xl border transition-all duration-500 ${progress > (i + 1) * 30 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-white/5 border-white/10 text-zinc-600'}`}>
-                          <div className="flex items-center gap-3">
-                            {progress > (i + 1) * 30 ? <Check size={14} /> : <div className="w-1.5 h-1.5 rounded-full bg-current" />}
-                            <span className="text-[8px] font-black uppercase tracking-widest">{step}</span>
+                    {isAnalyzing && (
+                      <div className="grid grid-cols-3 gap-4">
+                        {['Isolating Tracks', 'Detecting Chords', 'Syncing Lyrics'].map((step, i) => (
+                          <div key={step} className={`p-4 rounded-2xl border transition-all duration-500 ${progress > (i + 1) * 30 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-white/5 border-white/10 text-zinc-600'}`}>
+                            <div className="flex items-center gap-3">
+                              {progress > (i + 1) * 30 ? <Check size={14} /> : <div className="w-1.5 h-1.5 rounded-full bg-current" />}
+                              <span className="text-[8px] font-black uppercase tracking-widest">{step}</span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {isIdentifying && progress > 50 && (
+                      <div className="text-center pt-4">
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-4">Taking longer than expected?</p>
+                        <button 
+                          onClick={() => {
+                            setIsIdentifying(false);
+                            setPendingSong({ title: '', artist: '', chords: [], fingerings: [] });
+                          }}
+                          className="text-[#D96611] text-[10px] font-black uppercase tracking-widest hover:underline"
+                        >
+                          Enter Details Manually
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </GlassCard>
               )}
@@ -707,7 +757,7 @@ export default function App() {
                       <div className="flex flex-col lg:flex-row items-start justify-between gap-12">
                         <div className="space-y-4">
                           <div className="flex items-center gap-3">
-                            <span className="px-3 py-1 bg-[#F27D26]/10 text-[#F27D26] rounded-lg text-[10px] font-black uppercase tracking-widest">Transcription Complete</span>
+                            <span className="px-3 py-1 bg-[#D96611]/10 text-[#D96611] rounded-lg text-[10px] font-black uppercase tracking-widest">Transcription Complete</span>
                             <span className="px-3 py-1 bg-black/5 text-zinc-600 rounded-lg text-[10px] font-black uppercase tracking-widest">{result.key}</span>
                           </div>
                           <h2 className="text-5xl font-black text-zinc-900 tracking-tight">{result.title}</h2>
@@ -742,7 +792,7 @@ export default function App() {
                             className={`flex items-center gap-3 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${
                               isSaved 
                                 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' 
-                                : 'bg-[#F27D26] hover:bg-[#FF8C37] border-transparent text-white shadow-xl shadow-[#F27D26]/20'
+                                : 'bg-[#D96611] hover:bg-[#FF8C37] border-transparent text-white shadow-xl shadow-[#D96611]/20'
                             }`}
                           >
                             {isSaved ? <Check size={18} /> : <Save size={18} />}
@@ -780,7 +830,7 @@ export default function App() {
                               max="24" 
                               value={lyricsFontSize} 
                               onChange={(e) => setLyricsFontSize(parseInt(e.target.value))}
-                              className="w-24 h-1 bg-black/10 rounded-full appearance-none cursor-pointer accent-[#F27D26]"
+                              className="w-24 h-1 bg-black/10 rounded-full appearance-none cursor-pointer accent-[#D96611]"
                             />
                           </div>
                         </div>
@@ -789,9 +839,12 @@ export default function App() {
                           style={{ fontSize: `${lyricsFontSize}px` }}
                         >
                           {result.lyrics.split('\n').map((line, i) => {
-                            const isChordLine = !/[a-z]/.test(line) && /[A-Z]/.test(line);
+                            // Improved chord line detection: Starts with a chord, contains mostly chords/spaces/brackets
+                            const chordRegex = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|M|[0-9])?(\/[A-G][#b]?)?(\s+[A-G][#b]?(m|maj|min|dim|aug|sus|add|M|[0-9])?(\/[A-G][#b]?)?|[\s\[\]])*$/i;
+                            const isChordLine = chordRegex.test(line.trim()) && line.trim().length > 0 && /[A-G]/.test(line);
+                            
                             return (
-                              <div key={i} className={isChordLine ? "font-black text-[#F27D26] mb-[-1.5em]" : ""}>
+                              <div key={i} className={isChordLine ? "font-black text-[#D96611] mb-[-1.5em]" : ""}>
                                 {line || ' '}
                               </div>
                             );
@@ -862,7 +915,7 @@ export default function App() {
               <button 
                 onClick={() => setView('transcribe')}
                 className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
-                  view === 'transcribe' ? 'bg-[#F27D26] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                  view === 'transcribe' ? 'bg-[#D96611] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'
                 }`}
               >
                 <FileAudio size={16} />
@@ -871,7 +924,7 @@ export default function App() {
               <button 
                 onClick={() => setView('library')}
                 className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
-                  view === 'library' ? 'bg-[#F27D26] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                  view === 'library' ? 'bg-[#D96611] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'
                 }`}
               >
                 <Music size={16} />

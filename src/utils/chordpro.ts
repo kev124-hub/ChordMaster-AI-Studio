@@ -12,6 +12,7 @@ export function convertToChordPro(analysis: SongAnalysis): string {
   if (analysis.tuning) lines.push(`{tuning: ${analysis.tuning}}`);
   if (analysis.timeSignature) lines.push(`{time: ${analysis.timeSignature}}`);
   if (analysis.duration) lines.push(`{duration: ${analysis.duration}}`);
+  if (analysis.performanceNotes) lines.push(`{performance-notes: ${analysis.performanceNotes}}`);
 
   lines.push("");
   lines.push(`{comment: Strumming: ${analysis.strummingPattern}}`);
@@ -81,7 +82,12 @@ export function convertToChordPro(analysis: SongAnalysis): string {
       } else {
         // Chord line with no lyrics following (e.g. Intro)
         const chordRegex = /[A-G][#b]?[mMajMinDimAugSusAdd0-9+]*/g;
-        const lineWithBrackets = currentLine.replace(chordRegex, '[$&]');
+        // Only wrap in brackets if not already bracketed
+        const lineWithBrackets = currentLine.replace(chordRegex, (match, offset, fullString) => {
+          const hasOpening = fullString[offset - 1] === '[';
+          const hasClosing = fullString[offset + match.length] === ']';
+          return (hasOpening && hasClosing) ? match : `[${match}]`;
+        });
         lines.push(lineWithBrackets);
       }
     } else if (currentLine.trim() !== '') {

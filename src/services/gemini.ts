@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 
 // Using your API key logic
 const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
@@ -50,20 +50,22 @@ function cleanJsonResponse(text: string) {
  * Combined analyzeSong logic: Your prompt + Frontend instructions
  */
 export async function analyzeSong(input: { type: 'url' | 'file', value: string, mimeType?: string } | string, knownDetails?: { title: string, artist: string }): Promise<SongAnalysis> {
-  const model = "gemini-3-flash-preview";
+  const model = "gemini-3.1-pro-preview";
   
   const frontendInstructions = `
-    Provide a high-precision harmonic analysis in the following format:
+    Provide a high-precision harmonic analysis focusing EXCLUSIVELY on the acoustic guitar rhythm track:
     1. Full lyrics with chords placed EXACTLY above the lyrics on separate lines (monospace alignment).
-    2. Detect complex chords accurately (e.g., maj7, m9, sus4, add9, diminished, augmented).
-    3. Capture rapid chord changes within measures.
-    4. Provide guitar fingerings for all unique chords. Ensure 'strings' array has 6 elements (E A D G B E).
-    5. Detailed strumming patterns (e.g., D D U U D U).
-    6. Musical key, tempo (BPM), and tuning.
-    7. List the diatonic chords for the identified key (Major: I, IV, V; Minor: ii, iii, vi).
-    8. Specify capo position (e.g., "Capo 2nd fret" or "No capo").
-    9. Approximate song duration in seconds.
-    10. Detailed performance notes including rhythmic guides, feel, and specific chord-beat indications.
+    2. DO NOT use brackets around chords (e.g., use "G" instead of "[G]").
+    3. Chords must be on their own lines, perfectly aligned with the lyrics below them using spaces.
+    4. Detect complex chords accurately as played on the acoustic guitar (e.g., maj7, m9, sus4, add9, diminished, augmented).
+    5. Capture rapid chord changes within measures.
+    6. Provide guitar fingerings for all unique chords. Ensure 'strings' array has 6 elements (E A D G B E).
+    7. Detailed strumming patterns specifically for the acoustic rhythm track (e.g., D D U U D U).
+    8. Musical key, tempo (BPM), and tuning relative to the acoustic guitar.
+    9. List the diatonic chords for the identified key.
+    10. Specify capo position used by the acoustic guitar (e.g., "Capo 2nd fret" or "No capo").
+    11. Approximate song duration in seconds.
+    12. Detailed performance notes including rhythmic guides, feel, and specific chord-beat indications for the acoustic guitar.
   `;
 
   let prompt: string;
@@ -79,13 +81,27 @@ CONTENT: ${input}`;
     
     if (knownDetails?.title && knownDetails?.artist) {
       content += `\n\nCRITICAL CONTEXT: This song has been identified as "${knownDetails.title}" by "${knownDetails.artist}". 
-      You MUST perform the analysis (lyrics, chords, key, tempo) for THIS SPECIFIC song. 
-      If the URL content seems to be a different song, ignore the URL's audio/metadata and use Google Search to find the correct chords and lyrics for "${knownDetails.title}" by "${knownDetails.artist}".`;
+      You MUST perform a direct musical analysis of the provided audio/URL, focusing SOLELY on the acoustic guitar rhythm track. 
+      Transcribe the chords and lyrics EXACTLY as they are performed in THIS SPECIFIC VERSION by the acoustic guitar. 
+      Use Google Search ONLY to verify the correct lyrics text or to find the official song metadata. 
+      DO NOT simply copy a generic chord chart from the web; your analysis must reflect the specific arrangement, tempo, and key of the provided media's acoustic guitar track. 
+      If the acoustic guitar is in a different key than the "official" version, transcribe the key of the guitar.`;
+    } else {
+      content += `\n\nPerform a direct musical analysis of the provided audio/URL, focusing SOLELY on the acoustic guitar rhythm track. 
+      Identify the song and transcribe the chords and lyrics EXACTLY as performed in this version by the acoustic guitar. 
+      Use Google Search to help identify the track and verify lyrics, but the chord transcription must be based on your analysis of the acoustic guitar's audio content.`;
     }
 
-    prompt = `INSTRUCTION: You are a professional musicologist and transcription engine. 
+    prompt = `INSTRUCTION: You are a world-class musicologist and transcription expert specializing in acoustic guitar. 
+Your task is to perform a deep harmonic and lyrical analysis of the provided audio or URL content, focusing SOLELY on the acoustic guitar rhythm track. 
 Output ONLY a valid JSON object. Do not include any conversational text.
-If you cannot access a URL, use Google Search to find the song's chords and lyrics based on the URL metadata or the provided song details.
+
+TRANSCRIPTION RULES:
+1. Listen to the audio content (or URL content) and transcribe the chords EXACTLY as played on the acoustic guitar rhythm track. Ignore other instruments.
+2. Match the acoustic guitar chords to the lyrics as performed in this specific recording.
+3. Use Google Search to verify the song's identity and to get the base lyrics text, but override any generic web charts with your own analysis of the SPECIFIC acoustic guitar performance (e.g., if they play a G/B instead of a G, or if the key is transposed).
+4. Ensure the chords are placed with character-perfect accuracy above the lyrics in the "lyrics" field.
+5. Pay close attention to the actual frequencies and rhythmic patterns of the acoustic guitar to determine the key, tempo, and capo position.
 
 REQUIRED JSON STRUCTURE:
 {
@@ -105,7 +121,7 @@ REQUIRED JSON STRUCTURE:
     "major": ["I", "IV", "V"],
     "minor": ["ii", "iii", "vi"]
   },
-  "performanceNotes": "Assumed common country/rock strumming... intro pattern 'I I G | D I Am | I C II' suggests rhythmic guide..."
+  "performanceNotes": "Describe the specific feel and rhythmic nuances of THIS performance. Mention if this version differs from standard versions."
 }
 
 ${frontendInstructions}
@@ -130,7 +146,7 @@ CONTENT: ${content}`;
     }
   }
 
-  const hasTools = typeof input !== 'string' && input.type === 'url';
+  const hasTools = true; // Always enable tools for better accuracy
   
   // Retry logic for 503 errors
   let attempts = 0;
@@ -142,8 +158,9 @@ CONTENT: ${content}`;
         model,
         contents: contents,
         config: {
-          tools: hasTools ? [{ googleSearch: {} }] : undefined,
+          tools: [{ googleSearch: {} }],
           responseMimeType: "application/json",
+          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
         },
       });
       
@@ -176,7 +193,7 @@ CONTENT: ${content}`;
  * Combined identifySong logic: Your prompt + Frontend compatibility
  */
 export async function identifySong(input: { type: 'url' | 'file', value: string, mimeType?: string } | ArrayBuffer): Promise<SongAnalysis> {
-  const model = "gemini-3-flash-preview";
+  const model = "gemini-3.1-pro-preview";
   
   let contents: any;
   if (input instanceof ArrayBuffer) {
@@ -195,12 +212,19 @@ export async function identifySong(input: { type: 'url' | 'file', value: string,
           },
         },
         {
-          text: "Identify this song. Return ONLY a JSON object: {\"title\": \"\", \"artist\": \"\", \"chords\": [], \"fingerings\": []}. If you are unsure, return an empty object.",
+          text: "Analyze this specific audio recording. Identify the song title and artist. Use Google Search to verify the metadata, but ensure your identification matches the actual audio content provided. Return ONLY a JSON object: {\"title\": \"\", \"artist\": \"\", \"chords\": [], \"fingerings\": []}. If you are unsure, return an empty object.",
         },
       ]
     }];
   } else if (input.type === 'url') {
-    contents = [{ parts: [{ text: `Identify this song from the URL. Use Google Search if needed. Return ONLY a JSON object: {"title": "", "artist": "", "chords": [], "fingerings": []}. URL: ${input.value}` }] }];
+    contents = [{ 
+      parts: [{ 
+        text: `Identify the song at this URL: ${input.value}. 
+        Use Google Search and URL Context to find the track title and artist. 
+        Return ONLY a JSON object: {"title": "", "artist": "", "chords": [], "fingerings": []}. 
+        If you cannot identify the song, return an empty object with "Unknown" values.` 
+      }] 
+    }];
   } else {
     contents = [{
       parts: [
@@ -211,13 +235,13 @@ export async function identifySong(input: { type: 'url' | 'file', value: string,
           },
         },
         {
-          text: "Identify this song. Return ONLY a JSON object: {\"title\": \"\", \"artist\": \"\", \"chords\": [], \"fingerings\": []}. If you are unsure, return an empty object.",
+          text: "Analyze this specific audio recording. Identify the song title and artist. Use Google Search to verify the metadata, but ensure your identification matches the actual audio content provided. Return ONLY a JSON object: {\"title\": \"\", \"artist\": \"\", \"chords\": [], \"fingerings\": []}. If you are unsure, return an empty object.",
         },
       ]
     }];
   }
 
-  const hasTools = typeof input !== 'string' && (input as any).type === 'url';
+  const hasTools = true; // Always enable tools for better accuracy
   
   let attempts = 0;
   const maxAttempts = 3;
@@ -228,8 +252,9 @@ export async function identifySong(input: { type: 'url' | 'file', value: string,
         model,
         contents: contents,
         config: {
-          tools: hasTools ? [{ googleSearch: {} }] : undefined,
+          tools: [{ googleSearch: {} }, { urlContext: {} }],
           responseMimeType: "application/json",
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         },
       });
       
