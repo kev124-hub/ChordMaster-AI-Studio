@@ -314,15 +314,15 @@ export default function App() {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       const allowedTypes = [
-        'audio/mpeg', 'audio/mp3', 'audio/x-m4a', 'audio/mp4', 
-        'video/mp4', 'video/mpeg', 'video/quicktime', 'application/pdf'
+        'audio/mpeg', 'audio/mp3', 'audio/x-m4a', 'audio/mp4',
+        'video/mp4', 'video/mpeg', 'video/quicktime'
       ];
       if (allowedTypes.includes(selectedFile.type)) {
         setFile(selectedFile);
         setUrl('');
         setError(null);
       } else {
-        setError('Please upload a valid audio (MP3/M4A), video (MP4/MOV), or PDF file.');
+        setError('Please upload a valid audio (MP3/M4A) or video (MP4/MOV) file.');
       }
     }
   };
@@ -378,23 +378,6 @@ export default function App() {
       }
       setResult(analysis);
       setProgress(100);
-
-      // Calculate initial duration if missing
-      if (!analysis.duration) {
-        const chordPro = convertToChordPro(analysis);
-        const measureLines = chordPro.split('\n').filter(l => l.includes('|'));
-        const measureCount = measureLines.reduce((acc, line) => acc + (line.match(/\|/g)?.length || 0), 0);
-        
-        if (measureCount > 0) {
-          const tempo = parseInt(analysis.tempo || '120') || 120;
-          const timeSig = analysis.timeSignature || '4/4';
-          const beatsPerMeasure = parseInt(timeSig.split('/')[0]) || 4;
-          const calculatedDuration = Math.round((measureCount * beatsPerMeasure) / (tempo / 60));
-          analysis.duration = calculatedDuration > 30 ? calculatedDuration : 180;
-        } else {
-          analysis.duration = 180;
-        }
-      }
 
       // Check for missing info
       if (!analysis.key || !analysis.tempo || !analysis.strummingPattern || 
@@ -506,8 +489,16 @@ export default function App() {
       id: Date.now().toString(),
     };
     library.push(newSong);
-    localStorage.setItem('chordmaster_library', JSON.stringify(library));
-    setIsSaved(true);
+    try {
+      localStorage.setItem('chordmaster_library', JSON.stringify(library));
+      setIsSaved(true);
+    } catch (e) {
+      if ((e as DOMException).name === 'QuotaExceededError') {
+        setError('Local storage full. Sign in to save songs to the cloud.');
+      } else {
+        throw e;
+      }
+    }
   };
 
   return (
