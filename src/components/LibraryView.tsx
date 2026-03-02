@@ -5,12 +5,15 @@ import {
   ChevronRight, MoreVertical, FileText,
   Settings as SettingsIcon, Database, HardDrive,
   Type, Palette, Sliders, ArrowLeft, Check,
-  Edit2, Save, X as CloseIcon
+  Edit2, Save, X as CloseIcon, Share2, Cloud, CloudOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SongAnalysis } from '../services/gemini';
 import { convertToChordPro } from '../utils/chordpro';
 import { AppSettings } from '../App';
+import { db } from '../services/firebase';
+import { collection, query, where, onSnapshot, doc, deleteDoc, updateDoc, setDoc, getDocs } from 'firebase/firestore';
+import { User } from 'firebase/auth';
 
 interface SavedSong {
   id: string;
@@ -18,6 +21,8 @@ interface SavedSong {
   chordPro: string;
   savedAt: number;
   isFavorite?: boolean;
+  userId?: string;
+  isShared?: boolean;
 }
 
 interface LibraryViewProps {
@@ -25,6 +30,7 @@ interface LibraryViewProps {
   onBack: () => void;
   settings: AppSettings;
   onUpdateSettings: (settings: AppSettings) => void;
+  user: User | null;
 }
 
 const GlassCard = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => (
@@ -33,32 +39,116 @@ const GlassCard = ({ children, className = "" }: { children: React.ReactNode, cl
   </div>
 );
 
-export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settings, onUpdateSettings }) => {
+export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settings, onUpdateSettings, user }) => {
   const [songs, setSongs] = useState<SavedSong[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'favorites'>('all');
+  const [filter, setFilter] = useState<'all' | 'favorites' | 'shared'>('all');
   const [subView, setSubView] = useState<'list' | 'settings' | 'edit'>('list');
   const [editingSong, setEditingSong] = useState<SavedSong | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
+    // Load local songs first
     const saved = localStorage.getItem('chordmaster_library');
-    if (saved) {
-      setSongs(JSON.parse(saved));
-    }
-  }, []);
+    let localSongs: SavedSong[] = saved ? JSON.parse(saved) : [];
+    setSongs(localSongs);
 
-  const deleteSong = (id: string) => {
+    if (user && db) {
+      setIsSyncing(true);
+      
+      // 1. Initial sync: Upload local songs that don't have a userId or are not in Firestore
+      const syncLocalToCloud = async () => {
+        if (!db) return;
+        const q = query(collection(db, 'songs'), where('userId', '==', user.uid));
+        const snapshot = await getDocs(q);
+        const cloudIds = new Set(snapshot.docs.map(doc => doc.id));
+        
+        for (const localSong of localSongs) {
+          if (!cloudIds.has(localSong.id)) {
+            try {
+              const { id, ...songData } = localSong;
+              await setDoc(doc(db, 'songs', id), {
+                ...songData,
+                userId: user.uid,
+                savedAt: localSong.savedAt || Date.now()
+              });
+            } catch (err) {
+              console.error("Error syncing local song to cloud:", err);
+            }
+          }
+        }
+      };
+
+      syncLocalToCloud();
+
+      // 2. Real-time listener for cloud changes
+      const q = query(collection(db, 'songs'), where('userId', '==', user.uid));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const firestoreSongs = snapshot.docs.map(doc => ({
+          ...doc.data(),
+          id: doc.id,
+        })) as SavedSong[];
+
+        setSongs(firestoreSongs);
+        localStorage.setItem('chordmaster_library', JSON.stringify(firestoreSongs));
+        setIsSyncing(false);
+      });
+
+      return () => unsubscribe();
+    }
+  }, [user]);
+
+  const deleteSong = async (id: string) => {
     if (confirm('Are you sure you want to delete this song?')) {
-      const updated = songs.filter(s => s.id !== id);
+      if (user && db) {
+        try {
+          await deleteDoc(doc(db, 'songs', id));
+        } catch (err) {
+          console.error("Error deleting from Firestore:", err);
+        }
+      } else {
+        const updated = songs.filter(s => s.id !== id);
+        setSongs(updated);
+        localStorage.setItem('chordmaster_library', JSON.stringify(updated));
+      }
+    }
+  };
+
+  const toggleFavorite = async (id: string) => {
+    const song = songs.find(s => s.id === id);
+    if (!song) return;
+
+    if (user && db) {
+      try {
+        await updateDoc(doc(db, 'songs', id), {
+          isFavorite: !song.isFavorite
+        });
+      } catch (err) {
+        console.error("Error updating Firestore:", err);
+      }
+    } else {
+      const updated = songs.map(s => s.id === id ? { ...s, isFavorite: !s.isFavorite } : s);
       setSongs(updated);
       localStorage.setItem('chordmaster_library', JSON.stringify(updated));
     }
   };
 
-  const toggleFavorite = (id: string) => {
-    const updated = songs.map(s => s.id === id ? { ...s, isFavorite: !s.isFavorite } : s);
-    setSongs(updated);
-    localStorage.setItem('chordmaster_library', JSON.stringify(updated));
+  const shareSong = async (song: SavedSong) => {
+    if (!user || !db) {
+      alert(db ? 'Please sign in to share songs.' : 'Cloud services are not configured.');
+      return;
+    }
+
+    try {
+      const shareUrl = `${window.location.origin}/share/${song.id}`;
+      await updateDoc(doc(db, 'songs', song.id), {
+        isShared: true
+      });
+      await navigator.clipboard.writeText(shareUrl);
+      alert('Share link copied to clipboard!');
+    } catch (err) {
+      console.error("Error sharing song:", err);
+    }
   };
 
   const handleEdit = (song: SavedSong) => {
@@ -66,7 +156,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
     setSubView('edit');
   };
 
-  const saveEdit = (updatedSong: SavedSong) => {
+  const saveEdit = async (updatedSong: SavedSong) => {
     // Sync metadata back to chordPro text tags
     let newChordPro = updatedSong.chordPro;
     const tags = [
@@ -93,9 +183,20 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
     });
 
     const finalSong = { ...updatedSong, chordPro: newChordPro };
-    const updated = songs.map(s => s.id === finalSong.id ? finalSong : s);
-    setSongs(updated);
-    localStorage.setItem('chordmaster_library', JSON.stringify(updated));
+    
+    if (user && db) {
+      try {
+        const { id, ...songData } = finalSong;
+        await setDoc(doc(db, 'songs', id), songData);
+      } catch (err) {
+        console.error("Error updating Firestore:", err);
+      }
+    } else {
+      const updated = songs.map(s => s.id === finalSong.id ? finalSong : s);
+      setSongs(updated);
+      localStorage.setItem('chordmaster_library', JSON.stringify(updated));
+    }
+    
     setSubView('list');
     setEditingSong(null);
   };
@@ -110,7 +211,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
   const filteredSongs = songs.filter(s => {
     const matchesSearch = s.analysis.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           s.analysis.artist.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filter === 'all' || s.isFavorite;
+    const matchesFilter = filter === 'all' || (filter === 'favorites' && s.isFavorite) || (filter === 'shared' && s.isShared);
     return matchesSearch && matchesFilter;
   });
 
@@ -446,11 +547,25 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
     <div className="min-h-screen pb-32">
       <div className="max-w-5xl mx-auto px-6 pt-12 space-y-12">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
           <div className="space-y-4">
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-zinc-900">Library</h1>
             <div className="flex items-center gap-4">
               <span className="text-[10px] font-black uppercase tracking-[0.4em] text-[#8C400B]">{songs.length} Transcriptions</span>
+              <div className="w-1 h-1 rounded-full bg-zinc-400" />
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600">
+                {user ? (
+                  <span className="flex items-center gap-2 text-emerald-600">
+                    <Cloud size={14} />
+                    Cloud Synced
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2 text-zinc-400">
+                    <CloudOff size={14} />
+                    Local Only
+                  </span>
+                )}
+              </div>
               <div className="w-1 h-1 rounded-full bg-zinc-400" />
               <button 
                 onClick={() => setSubView('settings')}
@@ -494,6 +609,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
           >
             Favorites
           </button>
+          <button 
+            onClick={() => setFilter('shared')}
+            className={`px-10 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+              filter === 'shared' ? 'bg-[#D96611] text-white shadow-xl shadow-[#D96611]/20' : 'text-zinc-600 hover:text-zinc-900 hover:bg-black/5'
+            }`}
+          >
+            Shared
+          </button>
         </div>
 
         {/* Song Grid */}
@@ -536,6 +659,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onPlay, onBack, settin
                           className={`p-2 md:p-3 rounded-xl md:rounded-2xl transition-all border ${song.isFavorite ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500' : 'bg-white/5 border-white/10 text-zinc-600 hover:text-white hover:bg-white/10'}`}
                         >
                           <Star size={16} className="md:w-[18px] md:h-[18px]" fill={song.isFavorite ? 'currentColor' : 'none'} />
+                        </button>
+                        <button 
+                          onClick={() => shareSong(song)}
+                          className={`p-2 md:p-3 rounded-xl md:rounded-2xl transition-all border ${song.isShared ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-white/5 border-white/10 text-zinc-600 hover:text-white hover:bg-white/10'}`}
+                        >
+                          <Share2 size={16} className="md:w-[18px] md:h-[18px]" />
                         </button>
                         <button 
                           onClick={() => handleEdit(song)}

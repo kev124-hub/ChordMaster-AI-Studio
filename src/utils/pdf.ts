@@ -25,10 +25,14 @@ function drawChordDiagram(doc: jsPDF, fingering: ChordFingering, x: number, y: n
     doc.line(x + i * stringWidth, y, x + i * stringWidth, y + 5 * fretHeight);
   }
 
+  const strings = fingering?.strings || [];
+  if (!Array.isArray(strings)) return;
+
   // Markers
-  fingering.strings.forEach((val, sIndex) => {
+  strings.forEach((val, sIndex) => {
+    if (sIndex > 5) return;
     const sx = x + sIndex * stringWidth;
-    const lowerVal = val.toString().toLowerCase();
+    const lowerVal = val?.toString().toLowerCase() || 'x';
     if (lowerVal === 'x') {
       doc.setTextColor(255, 0, 0);
       doc.setFontSize(5);

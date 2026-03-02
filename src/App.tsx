@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Music, Youtube, FileAudio, Download, Loader2, Play, Trash2, Guitar, Info, FileJson, Save, Check, Library, X, FileText, ChevronRight, WifiOff } from 'lucide-react';
+import { Music, Youtube, FileAudio, Download, Loader2, Play, Trash2, Guitar, Info, FileJson, Save, Check, Library, X, FileText, ChevronRight, WifiOff, Cloud, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { analyzeSong, identifySong, SongAnalysis, ChordFingering } from './services/gemini';
 import { generateSongPDF } from './utils/pdf';
 import { SongPlayer } from './components/SongPlayer';
 import { LibraryView } from './components/LibraryView';
 import { convertToChordPro, downloadChordPro } from './utils/chordpro';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { db, auth } from './services/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { Auth, UserProfile } from './components/Auth';
 
 export interface AppSettings {
   display: {
@@ -66,8 +70,10 @@ const GlassCard = ({ children, className = "" }: { children: React.ReactNode, cl
 const ChordDiagram = ({ fingering }: { fingering: ChordFingering }) => {
   // strings: E A D G B E
   // 0 for open, x for muted, 1-5 for frets
-  const strings = fingering.strings;
+  const strings = fingering.strings || [];
   
+  if (!strings || !Array.isArray(strings)) return null;
+
   return (
     <div className="flex flex-col items-center p-4 bg-white/20 backdrop-blur-md rounded-2xl border border-white/20 shadow-xl w-32 group hover:border-[#D96611]/30 transition-all">
       <span className="text-xs font-black mb-3 text-zinc-700 group-hover:text-zinc-900 transition-colors uppercase tracking-widest">{fingering.chord}</span>
@@ -87,8 +93,9 @@ const ChordDiagram = ({ fingering }: { fingering: ChordFingering }) => {
 
         {/* Markers */}
         {strings.map((val, sIndex) => {
+          if (sIndex > 5) return null; // Only 6 strings
           const x = 10 + sIndex * 12;
-          const lowerVal = val.toString().toLowerCase();
+          const lowerVal = val?.toString().toLowerCase() || 'x';
           if (lowerVal === 'x') {
             return <text key={sIndex} x={x} y="15" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#EF4444">X</text>;
           }
@@ -229,7 +236,37 @@ export default function App() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [view, setView] = useState<'transcribe' | 'library'>('transcribe');
   const [playingSong, setPlayingSong] = useState<{ text: string, title: string } | null>(null);
+  const loadSharedSong = async (id: string) => {
+    if (!db) {
+      setError("Cloud services are not configured.");
+      return;
+    }
+    setIsAnalyzing(true);
+    setError(null);
+    try {
+      const songDoc = await getDoc(doc(db, 'songs', id));
+      if (songDoc.exists()) {
+        const data = songDoc.data();
+        if (data.isShared) {
+          setPlayingSong({ text: data.chordPro, title: data.analysis.title });
+          // Clear URL to show the song
+          window.history.replaceState({}, '', '/');
+        } else {
+          setError("This song is not shared publicly.");
+        }
+      } else {
+        setError("Shared song not found.");
+      }
+    } catch (err) {
+      console.error("Error loading shared song:", err);
+      setError("Failed to load shared song.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
   const [showMissingInfo, setShowMissingInfo] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('chordmaster_settings');
     return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
@@ -241,8 +278,25 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
+
+    // Handle shared songs
+    const path = window.location.pathname;
+    if (path.startsWith('/share/')) {
+      const songId = path.split('/share/')[1];
+      if (songId) {
+        loadSharedSong(songId);
+      }
+    }
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -418,19 +472,39 @@ export default function App() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const saveToLibrary = () => {
+  const saveToLibrary = async () => {
     if (!result) return;
     const chordPro = convertToChordPro(result);
-    const saved = localStorage.getItem('chordmaster_library');
-    const library = saved ? JSON.parse(saved) : [];
     
-    const newSong = {
-      id: Date.now().toString(),
+    const newSongData = {
       analysis: result,
       chordPro,
-      savedAt: Date.now()
+      savedAt: Date.now(),
+      userId: user?.uid || null,
     };
 
+    if (user) {
+      try {
+        await addDoc(collection(db, 'songs'), newSongData);
+        setIsSaved(true);
+      } catch (err) {
+        console.error("Error saving to Firestore:", err);
+        setError("Failed to sync with cloud. Song saved locally.");
+        // Fallback to local
+        saveLocally(newSongData);
+      }
+    } else {
+      saveLocally(newSongData);
+    }
+  };
+
+  const saveLocally = (songData: any) => {
+    const saved = localStorage.getItem('chordmaster_library');
+    const library = saved ? JSON.parse(saved) : [];
+    const newSong = {
+      ...songData,
+      id: Date.now().toString(),
+    };
     library.push(newSong);
     localStorage.setItem('chordmaster_library', JSON.stringify(library));
     setIsSaved(true);
@@ -467,23 +541,31 @@ export default function App() {
                 <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em] mt-1">Precision Transcription Engine</p>
               </div>
             </div>
-            <div className="hidden md:flex flex-col items-end gap-3">
-              <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4 md:gap-8">
+              <button 
+                onClick={() => setView('library')}
+                className="flex items-center gap-3 px-6 py-3 bg-white/20 hover:bg-white/30 text-zinc-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/30 shadow-xl"
+              >
+                <Library size={16} className="text-[#D96611]" />
+                Library
+              </button>
+              
+              {user ? (
+                <UserProfile user={user} />
+              ) : (
                 <button 
-                  onClick={() => setView('library')}
-                  className="flex items-center gap-3 px-6 py-3 bg-white/20 hover:bg-white/30 text-zinc-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/30 shadow-xl"
+                  onClick={() => setIsAuthOpen(true)}
+                  className="flex items-center gap-3 px-6 py-3 bg-[#D96611] hover:bg-[#FF8C37] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-[#D96611]/20"
                 >
-                  <Library size={16} className="text-[#D96611]" />
-                  Library
+                  <Cloud size={16} />
+                  Sign In
                 </button>
-                <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
-                  <div className={`w-2 h-2 rounded-full ${isAnalyzing || isIdentifying ? 'bg-orange-500 animate-pulse shadow-[0_0_10px_rgba(249,115,22,0.5)]' : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]'}`} />
-                  {isAnalyzing ? 'Analyzing Stream' : isIdentifying ? 'Identifying' : 'System Ready'}
-                </div>
-              </div>
+              )}
             </div>
           </header>
         )}
+
+        <Auth isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
 
         <main className="space-y-12">
           {view === 'library' ? (
@@ -492,6 +574,7 @@ export default function App() {
               onBack={() => setView('transcribe')}
               settings={settings}
               onUpdateSettings={updateSettings}
+              user={user}
             />
           ) : (
             <>
@@ -607,7 +690,9 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-base font-black text-zinc-900">Ready to Process</p>
-                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em]">Step 1: Identify & Extract</p>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em]">
+                            {file ? 'Live Performance Filtering Active' : 'Step 1: Identify & Extract'}
+                          </p>
                         </div>
                       </div>
                       
@@ -692,12 +777,12 @@ export default function App() {
                     </div>
 
                     {isAnalyzing && (
-                      <div className="grid grid-cols-3 gap-4">
-                        {['Isolating Tracks', 'Detecting Chords', 'Syncing Lyrics'].map((step, i) => (
-                          <div key={step} className={`p-4 rounded-2xl border transition-all duration-500 ${progress > (i + 1) * 30 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-white/5 border-white/10 text-zinc-600'}`}>
-                            <div className="flex items-center gap-3">
-                              {progress > (i + 1) * 30 ? <Check size={14} /> : <div className="w-1.5 h-1.5 rounded-full bg-current" />}
-                              <span className="text-[8px] font-black uppercase tracking-widest">{step}</span>
+                      <div className="grid grid-cols-4 gap-4">
+                        {['Noise Cancellation', 'Isolating Tracks', 'Detecting Chords', 'Syncing Lyrics'].map((step, i) => (
+                          <div key={step} className={`p-4 rounded-2xl border transition-all duration-500 ${progress > (i + 1) * 20 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-white/5 border-white/10 text-zinc-600'}`}>
+                            <div className="flex flex-col items-center gap-2 text-center">
+                              {progress > (i + 1) * 20 ? <Check size={14} /> : <div className="w-1.5 h-1.5 rounded-full bg-current" />}
+                              <span className="text-[7px] md:text-[8px] font-black uppercase tracking-widest">{step}</span>
                             </div>
                           </div>
                         ))}

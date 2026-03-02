@@ -19,10 +19,12 @@ interface SongPlayerProps {
 }
 
 const ChordDiagram = ({ fingering, theme }: { fingering: any, theme: string }) => {
-  const strings = fingering.strings;
+  const strings = fingering?.strings || [];
   const isDark = theme === 'dark';
   const strokeColor = isDark ? 'white' : 'black';
   
+  if (!strings || !Array.isArray(strings)) return null;
+
   return (
     <div className={`flex flex-col items-center p-2 rounded-xl border w-20 shrink-0 ${isDark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/10'}`}>
       <span className={`text-[8px] font-black mb-1 uppercase tracking-widest ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>{fingering.chord}</span>
@@ -35,8 +37,9 @@ const ChordDiagram = ({ fingering, theme }: { fingering: any, theme: string }) =
           <line key={s} x1={10 + s * 12} y1="20" x2={10 + s * 12} y2="100" stroke={strokeColor} strokeWidth="1" strokeOpacity="0.2" />
         ))}
         {strings.map((val: any, sIndex: number) => {
+          if (sIndex > 5) return null;
           const x = 10 + sIndex * 12;
-          const lowerVal = val.toString().toLowerCase();
+          const lowerVal = val?.toString().toLowerCase() || 'x';
           if (lowerVal === 'x') return <text key={sIndex} x={x} y="15" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#EF4444">X</text>;
           if (lowerVal === '0') return <circle key={sIndex} cx={x} cy="12" r="3" fill="none" stroke={strokeColor} strokeWidth="1" strokeOpacity="0.5" />;
           const fret = parseInt(val);
