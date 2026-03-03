@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── User song library ────────────────────────────────────────────────────
+    match /songs/{songId} {
+      // Owner can read/write their own songs
+      allow read, write: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+      // Anyone can read a song that has been explicitly shared
+      allow read: if resource.data.isShared == true;
+    }
+
+    // ── Analysis cache (read-only for clients) ───────────────────────────────
+    // Written only by the backend (Firebase Admin SDK bypasses rules).
+    match /analysis_cache/{cacheId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ── Job progress documents ───────────────────────────────────────────────
+    // Created and updated exclusively by Firebase Functions (Admin SDK).
+    // Each authenticated user may only read their own jobs.
+    match /jobs/{jobId} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ── Default: deny everything else ────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

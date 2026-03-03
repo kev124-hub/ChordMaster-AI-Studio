@@ -4,12 +4,11 @@ import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({mode}) => {
-  const env = loadEnv(mode, '.', '');
+  loadEnv(mode, '.', ''); // keep for any other VITE_* vars that may be added
   return {
     plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
+    // GEMINI_API_KEY is intentionally NOT exposed to the client bundle.
+    // All Gemini calls are made server-side via Firebase Functions.
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

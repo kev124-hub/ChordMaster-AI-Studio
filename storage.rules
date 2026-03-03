@@ -1,0 +1,18 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Authenticated users may upload to their own uploads/ folder only.
+    // The backend (Admin SDK) handles reads and deletes.
+    match /uploads/{userId}/{allPaths=**} {
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 200 * 1024 * 1024; // 200 MB max
+      allow read, delete: if false; // backend-only via Admin SDK
+    }
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
