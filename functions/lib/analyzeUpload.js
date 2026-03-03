@@ -45,8 +45,6 @@ const axios_1 = __importDefault(require("axios"));
 // Re-use the same secrets already declared in analyzeTrack.ts — Firebase
 // Functions deduplicates secrets by name, so we declare them locally here too.
 const geminiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
-const modalTokenId = (0, params_1.defineSecret)("MODAL_TOKEN_ID");
-const modalTokenSecret = (0, params_1.defineSecret)("MODAL_TOKEN_SECRET");
 const MODEL = "gemini-2.5-pro-preview-05-06";
 // ── Helpers (mirrors of analyzeTrack.ts — kept local to avoid circular deps) ─
 function cleanJsonResponse(text) {
@@ -60,16 +58,13 @@ function cleanJsonResponse(text) {
     }
     return cleaned;
 }
-async function callModal(audioUrl, tokenId, tokenSecret) {
+async function callModal(audioUrl) {
     const modalEndpoint = process.env.MODAL_ENDPOINT;
     if (!modalEndpoint) {
         throw new Error("MODAL_ENDPOINT environment variable is not set. Deploy the Modal service first.");
     }
     const resp = await axios_1.default.post(modalEndpoint, { url: audioUrl }, {
-        headers: {
-            Authorization: `Bearer ${Buffer.from(`${tokenId}:${tokenSecret}`).toString("base64")}`,
-            "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         timeout: 180000, // 3 min for Demucs
     });
     const stemB64 = resp.data.stem_b64;
@@ -157,7 +152,7 @@ STRICT RULES:
  * be set by the client on the upload task.
  */
 exports.analyzeUpload = (0, storage_1.onObjectFinalized)({
-    secrets: [geminiKey, modalTokenId, modalTokenSecret],
+    secrets: [geminiKey],
     memory: "1GiB",
     timeoutSeconds: 300,
     region: "us-central1",
@@ -204,7 +199,7 @@ exports.analyzeUpload = (0, storage_1.onObjectFinalized)({
             expires: Date.now() + 20 * 60 * 1000, // 20 minutes
         });
         // Call Modal.com for audio isolation
-        const stemB64 = await callModal(signedUrl, modalTokenId.value(), modalTokenSecret.value());
+        const stemB64 = await callModal(signedUrl);
         await jobRef.update({ stage: "analyzing", pct: 70 });
         // Call Gemini with the guitar stem
         const analysis = await callGeminiWithStem(stemB64, geminiKey.value(), knownDetails);

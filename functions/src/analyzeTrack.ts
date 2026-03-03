@@ -11,8 +11,6 @@ export const geminiKey = defineSecret("GEMINI_API_KEY");
 export const spotifyClientId = defineSecret("SPOTIFY_CLIENT_ID");
 export const spotifyClientSecret = defineSecret("SPOTIFY_CLIENT_SECRET");
 export const youtubeDataApiKey = defineSecret("YOUTUBE_DATA_API_KEY");
-export const modalTokenId = defineSecret("MODAL_TOKEN_ID");
-export const modalTokenSecret = defineSecret("MODAL_TOKEN_SECRET");
 
 const MODEL = "gemini-2.5-pro-preview-05-06";
 
@@ -72,13 +70,7 @@ async function searchYoutube(
  * Call Modal.com to download audio from a URL, run noisereduce + Demucs,
  * and return the guitar-stem WAV as base64.
  */
-async function callModal(
-  audioUrl: string,
-  tokenId: string,
-  tokenSecret: string
-): Promise<string> {
-  // Modal.com web endpoint URL — set via MODAL_ENDPOINT env var or defaults to
-  // the deployed app URL pattern.
+async function callModal(audioUrl: string): Promise<string> {
   const modalEndpoint = process.env.MODAL_ENDPOINT;
   if (!modalEndpoint) {
     throw new HttpsError(
@@ -91,12 +83,7 @@ async function callModal(
     modalEndpoint,
     { url: audioUrl },
     {
-      headers: {
-        Authorization: `Bearer ${Buffer.from(
-          `${tokenId}:${tokenSecret}`
-        ).toString("base64")}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       timeout: 180000, // 3 minutes for Demucs
     }
   );
@@ -205,14 +192,7 @@ ${frontendInstructions}`;
 
 export const analyzeTrack = onCall(
   {
-    secrets: [
-      geminiKey,
-      spotifyClientId,
-      spotifyClientSecret,
-      youtubeDataApiKey,
-      modalTokenId,
-      modalTokenSecret,
-    ],
+    secrets: [geminiKey, spotifyClientId, spotifyClientSecret, youtubeDataApiKey],
     memory: "1GiB",
     timeoutSeconds: 300,
     region: "us-central1",
@@ -297,11 +277,7 @@ export const analyzeTrack = onCall(
 
       // ── Call Modal.com for audio isolation ───────────────────────────────
       await jobRef.update({ stage: "isolating", pct: 20 });
-      const stemB64 = await callModal(
-        youtubeUrl,
-        modalTokenId.value(),
-        modalTokenSecret.value()
-      );
+      const stemB64 = await callModal(youtubeUrl);
 
       // ── Call Gemini with guitar stem ─────────────────────────────────────
       await jobRef.update({ stage: "analyzing", pct: 70 });

@@ -7,8 +7,6 @@ import axios from "axios";
 // Re-use the same secrets already declared in analyzeTrack.ts — Firebase
 // Functions deduplicates secrets by name, so we declare them locally here too.
 const geminiKey = defineSecret("GEMINI_API_KEY");
-const modalTokenId = defineSecret("MODAL_TOKEN_ID");
-const modalTokenSecret = defineSecret("MODAL_TOKEN_SECRET");
 
 const MODEL = "gemini-2.5-pro-preview-05-06";
 
@@ -26,11 +24,7 @@ function cleanJsonResponse(text: string): string {
   return cleaned;
 }
 
-async function callModal(
-  audioUrl: string,
-  tokenId: string,
-  tokenSecret: string
-): Promise<string> {
+async function callModal(audioUrl: string): Promise<string> {
   const modalEndpoint = process.env.MODAL_ENDPOINT;
   if (!modalEndpoint) {
     throw new Error(
@@ -41,12 +35,7 @@ async function callModal(
     modalEndpoint,
     { url: audioUrl },
     {
-      headers: {
-        Authorization: `Bearer ${Buffer.from(
-          `${tokenId}:${tokenSecret}`
-        ).toString("base64")}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       timeout: 180000, // 3 min for Demucs
     }
   );
@@ -147,7 +136,7 @@ STRICT RULES:
  */
 export const analyzeUpload = onObjectFinalized(
   {
-    secrets: [geminiKey, modalTokenId, modalTokenSecret],
+    secrets: [geminiKey],
     memory: "1GiB",
     timeoutSeconds: 300,
     region: "us-central1",
@@ -203,11 +192,7 @@ export const analyzeUpload = onObjectFinalized(
       });
 
       // Call Modal.com for audio isolation
-      const stemB64 = await callModal(
-        signedUrl,
-        modalTokenId.value(),
-        modalTokenSecret.value()
-      );
+      const stemB64 = await callModal(signedUrl);
 
       await jobRef.update({ stage: "analyzing", pct: 70 });
 

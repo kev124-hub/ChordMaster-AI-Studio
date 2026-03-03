@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.identifySong = exports.analyzeTrack = exports.modalTokenSecret = exports.modalTokenId = exports.youtubeDataApiKey = exports.spotifyClientSecret = exports.spotifyClientId = exports.geminiKey = void 0;
+exports.identifySong = exports.analyzeTrack = exports.youtubeDataApiKey = exports.spotifyClientSecret = exports.spotifyClientId = exports.geminiKey = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
@@ -49,8 +49,6 @@ exports.geminiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
 exports.spotifyClientId = (0, params_1.defineSecret)("SPOTIFY_CLIENT_ID");
 exports.spotifyClientSecret = (0, params_1.defineSecret)("SPOTIFY_CLIENT_SECRET");
 exports.youtubeDataApiKey = (0, params_1.defineSecret)("YOUTUBE_DATA_API_KEY");
-exports.modalTokenId = (0, params_1.defineSecret)("MODAL_TOKEN_ID");
-exports.modalTokenSecret = (0, params_1.defineSecret)("MODAL_TOKEN_SECRET");
 const MODEL = "gemini-2.5-pro-preview-05-06";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function cleanJsonResponse(text) {
@@ -99,18 +97,13 @@ async function searchYoutube(query, apiKey) {
  * Call Modal.com to download audio from a URL, run noisereduce + Demucs,
  * and return the guitar-stem WAV as base64.
  */
-async function callModal(audioUrl, tokenId, tokenSecret) {
-    // Modal.com web endpoint URL — set via MODAL_ENDPOINT env var or defaults to
-    // the deployed app URL pattern.
+async function callModal(audioUrl) {
     const modalEndpoint = process.env.MODAL_ENDPOINT;
     if (!modalEndpoint) {
         throw new https_1.HttpsError("failed-precondition", "MODAL_ENDPOINT environment variable is not set. Deploy the Modal service and set MODAL_ENDPOINT.");
     }
     const resp = await axios_1.default.post(modalEndpoint, { url: audioUrl }, {
-        headers: {
-            Authorization: `Bearer ${Buffer.from(`${tokenId}:${tokenSecret}`).toString("base64")}`,
-            "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         timeout: 180000, // 3 minutes for Demucs
     });
     const stemB64 = resp.data.stem_b64;
@@ -201,14 +194,7 @@ ${frontendInstructions}`;
 }
 // ── analyzeTrack ──────────────────────────────────────────────────────────────
 exports.analyzeTrack = (0, https_1.onCall)({
-    secrets: [
-        exports.geminiKey,
-        exports.spotifyClientId,
-        exports.spotifyClientSecret,
-        exports.youtubeDataApiKey,
-        exports.modalTokenId,
-        exports.modalTokenSecret,
-    ],
+    secrets: [exports.geminiKey, exports.spotifyClientId, exports.spotifyClientSecret, exports.youtubeDataApiKey],
     memory: "1GiB",
     timeoutSeconds: 300,
     region: "us-central1",
@@ -268,7 +254,7 @@ exports.analyzeTrack = (0, https_1.onCall)({
         }
         // ── Call Modal.com for audio isolation ───────────────────────────────
         await jobRef.update({ stage: "isolating", pct: 20 });
-        const stemB64 = await callModal(youtubeUrl, exports.modalTokenId.value(), exports.modalTokenSecret.value());
+        const stemB64 = await callModal(youtubeUrl);
         // ── Call Gemini with guitar stem ─────────────────────────────────────
         await jobRef.update({ stage: "analyzing", pct: 70 });
         const analysis = await callGeminiWithStem(stemB64, exports.geminiKey.value(), knownDetails);
