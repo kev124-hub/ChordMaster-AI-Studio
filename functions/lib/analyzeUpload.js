@@ -45,6 +45,7 @@ const axios_1 = __importDefault(require("axios"));
 // Re-use the same secrets already declared in analyzeTrack.ts — Firebase
 // Functions deduplicates secrets by name, so we declare them locally here too.
 const geminiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
+const storageBucket = (0, params_1.defineString)("STORAGE_BUCKET");
 const MODEL = "gemini-2.5-pro-preview-05-06";
 // ── Helpers (mirrors of analyzeTrack.ts — kept local to avoid circular deps) ─
 function cleanJsonResponse(text) {
@@ -152,6 +153,7 @@ STRICT RULES:
  * be set by the client on the upload task.
  */
 exports.analyzeUpload = (0, storage_1.onObjectFinalized)({
+    bucket: storageBucket,
     secrets: [geminiKey],
     memory: "1GiB",
     timeoutSeconds: 300,
