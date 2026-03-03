@@ -446,6 +446,12 @@ export default function App() {
       return;
     }
 
+    if (!user) {
+      setIsAuthOpen(true);
+      setError('Please sign in to analyse songs.');
+      return;
+    }
+
     // If it's a file, skip identification and go straight to analysis
     if (file) {
       runAnalysis();
