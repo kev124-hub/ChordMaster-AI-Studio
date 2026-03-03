@@ -17,12 +17,12 @@
     {
       "source": "functions",
       "codebase": "default",
+      "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"],
       "ignore": [
         "node_modules",
         ".git",
         "firebase-debug.log",
-        "firebase-debug.*.log",
-        "lib"
+        "firebase-debug.*.log"
       ]
     }
   ],
