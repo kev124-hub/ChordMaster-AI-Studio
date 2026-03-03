@@ -123,6 +123,6 @@ export async function identifySong(
     return result.data;
   } catch (error: any) {
     console.error("identifySong error:", error);
-    return { title: "Unknown", artist: "Unknown", chords: [], fingerings: [] };
+    throw error;
   }
 }
