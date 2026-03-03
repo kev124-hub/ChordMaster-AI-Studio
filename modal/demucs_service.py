@@ -129,7 +129,7 @@ def _run_demucs(input_wav: str, out_dir: str) -> Path:
     timeout=180,
     memory=8192,
 )
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def process_url(body: dict[str, Any]) -> dict[str, Any]:
     """
     POST body: { "url": "<youtube-or-signed-url>" }
