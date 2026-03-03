@@ -157,10 +157,12 @@ export const analyzeUpload = onObjectFinalized(
 
     const userId = segments[1];
     const fileSegment = segments.slice(2).join("/");
-    const underscoreIdx = fileSegment.indexOf("_");
-    if (underscoreIdx === -1) return;
+    const firstUnderscore = fileSegment.indexOf("_");
+    if (firstUnderscore === -1) return;
+    const secondUnderscore = fileSegment.indexOf("_", firstUnderscore + 1);
+    if (secondUnderscore === -1) return;
 
-    const jobId = fileSegment.substring(0, underscoreIdx);
+    const jobId = fileSegment.substring(0, secondUnderscore);
 
     // Read optional known details from custom metadata
     const metadata = event.data.metadata ?? {};
