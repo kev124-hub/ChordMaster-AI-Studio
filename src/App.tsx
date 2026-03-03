@@ -6,8 +6,9 @@ import { generateSongPDF } from './utils/pdf';
 import { SongPlayer } from './components/SongPlayer';
 import { LibraryView } from './components/LibraryView';
 import { convertToChordPro, downloadChordPro } from './utils/chordpro';
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
-import { db, auth } from './services/firebase';
+import { collection, addDoc, serverTimestamp, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { ref, uploadBytesResumable } from 'firebase/storage';
+import { db, auth, storage } from './services/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Auth, UserProfile } from './components/Auth';
 
@@ -308,29 +309,64 @@ export default function App() {
   }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const progressInterval = useRef<any>(null);
+  // Holds the Firestore onSnapshot unsubscribe function for the active job.
+  const jobUnsub = useRef<(() => void) | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       const allowedTypes = [
-        'audio/mpeg', 'audio/mp3', 'audio/x-m4a', 'audio/mp4', 
-        'video/mp4', 'video/mpeg', 'video/quicktime', 'application/pdf'
+        'audio/mpeg', 'audio/mp3', 'audio/x-m4a', 'audio/mp4',
+        'video/mp4', 'video/mpeg', 'video/quicktime'
       ];
       if (allowedTypes.includes(selectedFile.type)) {
         setFile(selectedFile);
         setUrl('');
         setError(null);
       } else {
-        setError('Please upload a valid audio (MP3/M4A), video (MP4/MOV), or PDF file.');
+        setError('Please upload a valid audio (MP3/M4A) or video (MP4/MOV) file.');
       }
     }
   };
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
+  /** Subscribe to a Firestore job doc and drive progress + result state. */
+  const subscribeToJob = (jobId: string) => {
+    // Cancel any previous listener
+    jobUnsub.current?.();
+    const jobRef = doc(db, 'jobs', jobId);
+    jobUnsub.current = onSnapshot(jobRef, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      setProgress(data.pct ?? 0);
+      if (data.stage === 'complete' && data.result) {
+        const analysis: SongAnalysis = data.result;
+        setResult(analysis);
+        setProgress(100);
+        setIsAnalyzing(false);
+        jobUnsub.current?.();
+        jobUnsub.current = null;
+        if (!analysis.key || !analysis.tempo || !analysis.strummingPattern ||
+            analysis.key.toLowerCase().includes('unknown') ||
+            analysis.tempo.toLowerCase().includes('unknown')) {
+          setShowMissingInfo(true);
+        }
+      } else if (data.stage === 'error') {
+        setError(data.error || 'Analysis failed.');
+        setIsAnalyzing(false);
+        jobUnsub.current?.();
+        jobUnsub.current = null;
+      }
+    });
+  };
+
+  // fileToBase64 removed — files now go through Firebase Storage (fixes BUG 4).
+
+  const fileToBase64 = (_file: File): Promise<string> => {
+    return new Promise((_resolve, reject) => {
+      // This path is no longer used — file uploads go through Storage.
+      reject(new Error('fileToBase64 is deprecated; use Storage upload path.'));
       const reader = new FileReader();
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(_file);
       reader.onload = () => {
         const base64 = (reader.result as string).split(',')[1];
         resolve(base64);
@@ -341,72 +377,66 @@ export default function App() {
 
   const runAnalysis = async () => {
     setIsAnalyzing(true);
-    const details = pendingSong; // Capture details before clearing
+    const details = pendingSong; // Capture before clearing
     setPendingSong(null);
     setProgress(0);
     setIsSaved(false);
-    
-    // Start progress simulation
-    const totalSeconds = 90; // More conservative estimate to avoid hanging at 99%
-    let currentProgress = 0;
-    progressInterval.current = setInterval(() => {
-      // Linear progress up to 80%, then slows down significantly
-      let increment = (100 / totalSeconds) / 10;
-      if (currentProgress > 80) {
-        increment *= 0.2; // Slow down to 20% speed after 80%
-      }
-      
-      currentProgress += increment;
-      if (currentProgress < 99.9) {
-        setProgress(currentProgress);
-      }
-    }, 100);
+
+    // Unique job ID — encoded into the Storage path so the backend trigger
+    // can match it to the correct Firestore document.
+    const uid = auth?.currentUser?.uid ?? 'anon';
+    const jobId = `${uid}_${Date.now()}`;
 
     try {
-      let analysis: SongAnalysis;
       if (file) {
-        const base64 = await fileToBase64(file);
-        analysis = await analyzeSong(
-          { type: 'file', value: base64, mimeType: file.type },
-          manualTitle && manualArtist ? { title: manualTitle, artist: manualArtist } : undefined
-        );
-        // Override with manual inputs if provided
-        if (manualTitle) analysis.title = manualTitle;
-        if (manualArtist) analysis.artist = manualArtist;
+        // ── File path: Storage resumable upload (fixes BUG 4) ──────────────
+        if (!storage) throw new Error('Firebase Storage is not configured.');
+
+        const storagePath = `uploads/${uid}/${jobId}_${file.name}`;
+        const storageRef = ref(storage, storagePath);
+
+        // Custom metadata carries optional manual title/artist to the trigger.
+        const customMetadata: Record<string, string> = {};
+        if (manualTitle) customMetadata.manualTitle = manualTitle;
+        if (manualArtist) customMetadata.manualArtist = manualArtist;
+
+        // Subscribe to job progress BEFORE starting the upload so we don't
+        // miss any early Firestore updates from the backend trigger.
+        subscribeToJob(jobId);
+
+        const uploadTask = uploadBytesResumable(storageRef, file, {
+          customMetadata,
+        });
+
+        // Drive progress bar 0–20 % during the upload phase.
+        uploadTask.on('state_changed', (snap) => {
+          const uploadPct = (snap.bytesTransferred / snap.totalBytes) * 20;
+          setProgress(uploadPct);
+        });
+
+        await new Promise<void>((resolve, reject) => {
+          uploadTask.on('state_changed', null,
+            (err) => reject(err),
+            () => resolve()
+          );
+        });
+        // From here the backend trigger drives progress via onSnapshot.
       } else {
-        analysis = await analyzeSong({ type: 'url', value: url }, details || undefined);
-      }
-      setResult(analysis);
-      setProgress(100);
-
-      // Calculate initial duration if missing
-      if (!analysis.duration) {
-        const chordPro = convertToChordPro(analysis);
-        const measureLines = chordPro.split('\n').filter(l => l.includes('|'));
-        const measureCount = measureLines.reduce((acc, line) => acc + (line.match(/\|/g)?.length || 0), 0);
-        
-        if (measureCount > 0) {
-          const tempo = parseInt(analysis.tempo || '120') || 120;
-          const timeSig = analysis.timeSignature || '4/4';
-          const beatsPerMeasure = parseInt(timeSig.split('/')[0]) || 4;
-          const calculatedDuration = Math.round((measureCount * beatsPerMeasure) / (tempo / 60));
-          analysis.duration = calculatedDuration > 30 ? calculatedDuration : 180;
-        } else {
-          analysis.duration = 180;
-        }
-      }
-
-      // Check for missing info
-      if (!analysis.key || !analysis.tempo || !analysis.strummingPattern || 
-          analysis.key.toLowerCase().includes('unknown') || 
-          analysis.tempo.toLowerCase().includes('unknown')) {
-        setShowMissingInfo(true);
+        // ── URL path: Firebase callable (fixes BUG 2 + 3) ─────────────────
+        subscribeToJob(jobId);
+        // analyzeSong() calls the backend function; progress arrives via onSnapshot.
+        await analyzeSong(
+          { type: 'url', value: url },
+          details || undefined,
+          jobId
+        );
+        // Result is handled inside subscribeToJob's onSnapshot callback.
       }
     } catch (err: any) {
+      jobUnsub.current?.();
+      jobUnsub.current = null;
       setError(err.message || 'An unexpected error occurred.');
-    } finally {
       setIsAnalyzing(false);
-      if (progressInterval.current) clearInterval(progressInterval.current);
     }
   };
 
@@ -428,27 +458,11 @@ export default function App() {
     setPendingSong(null);
     setProgress(0);
 
-    // Start progress simulation for identification
-    const totalSeconds = 30; // Identification should be faster
-    let currentProgress = 0;
-    const idInterval = setInterval(() => {
-      let increment = (100 / totalSeconds) / 10;
-      if (currentProgress > 80) {
-        increment *= 0.1; // Slow down significantly after 80%
-      }
-      currentProgress += increment;
-      if (currentProgress < 99) {
-        setProgress(currentProgress);
-      }
-    }, 100);
-
     try {
       const identification = await identifySong({ type: 'url', value: url });
-      clearInterval(idInterval);
       setProgress(100);
       setPendingSong(identification);
     } catch (err: any) {
-      clearInterval(idInterval);
       setError(err.message || 'Could not identify the song.');
     } finally {
       setIsIdentifying(false);
@@ -461,6 +475,8 @@ export default function App() {
   };
 
   const reset = () => {
+    jobUnsub.current?.();
+    jobUnsub.current = null;
     setUrl('');
     setFile(null);
     setResult(null);
@@ -506,8 +522,16 @@ export default function App() {
       id: Date.now().toString(),
     };
     library.push(newSong);
-    localStorage.setItem('chordmaster_library', JSON.stringify(library));
-    setIsSaved(true);
+    try {
+      localStorage.setItem('chordmaster_library', JSON.stringify(library));
+      setIsSaved(true);
+    } catch (e) {
+      if ((e as DOMException).name === 'QuotaExceededError') {
+        setError('Local storage full. Sign in to save songs to the cloud.');
+      } else {
+        throw e;
+      }
+    }
   };
 
   return (

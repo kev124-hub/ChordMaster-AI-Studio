@@ -14,7 +14,7 @@ const firebaseConfig = {
 
 const isFirebaseConfigured = !!firebaseConfig.apiKey;
 
-const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
+export const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
 export const auth = app ? getAuth(app) : null as any;
 export const db = app ? getFirestore(app) : null as any;
 export const storage = app ? getStorage(app) : null as any;
