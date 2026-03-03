@@ -38,6 +38,7 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg")
     .pip_install(
+        "fastapi[standard]>=0.115.0",
         "yt-dlp>=2024.1.0",
         "demucs>=4.0.0",
         "noisereduce>=3.0.0",
