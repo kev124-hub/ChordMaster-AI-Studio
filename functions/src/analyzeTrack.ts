@@ -12,7 +12,7 @@ export const spotifyClientId = defineSecret("SPOTIFY_CLIENT_ID");
 export const spotifyClientSecret = defineSecret("SPOTIFY_CLIENT_SECRET");
 export const youtubeDataApiKey = defineSecret("YOUTUBE_DATA_API_KEY");
 
-const MODEL = "gemini-2.5-pro-preview";
+const MODEL = "gemini-2.5-pro";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

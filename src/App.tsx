@@ -356,6 +356,12 @@ export default function App() {
         jobUnsub.current?.();
         jobUnsub.current = null;
       }
+    }, (err) => {
+      console.error('Job listener error:', err);
+      setError('Lost connection to analysis job. Please try again.');
+      setIsAnalyzing(false);
+      jobUnsub.current?.();
+      jobUnsub.current = null;
     });
   };
 
