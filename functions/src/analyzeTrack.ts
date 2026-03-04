@@ -67,73 +67,33 @@ async function searchYoutube(
 }
 
 /**
- * Call Modal.com to download audio from a URL, run noisereduce + Demucs,
- * and return the guitar-stem WAV as base64.
+ * Call Gemini with a YouTube URL using native video analysis (no yt-dlp needed).
+ * Gemini processes YouTube URLs directly from Google's infrastructure,
+ * avoiding cloud IP blocks that affect yt-dlp downloads.
  */
-async function callModal(audioUrl: string): Promise<string> {
-  const modalEndpoint = process.env.MODAL_ENDPOINT;
-  if (!modalEndpoint) {
-    throw new HttpsError(
-      "failed-precondition",
-      "MODAL_ENDPOINT environment variable is not set. Deploy the Modal service and set MODAL_ENDPOINT."
-    );
-  }
-
-  const resp = await axios.post(
-    modalEndpoint,
-    { url: audioUrl },
-    {
-      headers: { "Content-Type": "application/json" },
-      timeout: 180000, // 3 minutes for Demucs
-    }
-  );
-
-  const stemB64: string = resp.data.stem_b64;
-  if (!stemB64) {
-    throw new HttpsError(
-      "internal",
-      "Modal.com returned no stem data."
-    );
-  }
-  return stemB64;
-}
-
-/** Call Gemini with a guitar-stem WAV (base64) and return parsed SongAnalysis */
-async function callGeminiWithStem(
-  stemB64: string,
+async function callGeminiWithYoutubeUrl(
+  youtubeUrl: string,
   apiKey: string,
   knownDetails?: { title: string; artist: string }
 ): Promise<any> {
   const genAI = new GoogleGenAI({ apiKey });
 
-  const frontendInstructions = `
-STRICT TRANSCRIPTION RULES:
-1. Listen to the provided audio. It is the ONLY source for chords.
-2. Transcribe the lyrics word-for-word. Do not summarise.
-3. Identify chords played on the acoustic guitar.
-4. If the audio is silent or just noise, state that in performanceNotes.
-5. Never use external lyrics for uploaded audio files.`;
+  const contextNote =
+    knownDetails?.title && knownDetails?.artist
+      ? `\n\nCONTEXT: This has been identified as "${knownDetails.title}" by "${knownDetails.artist}". Transcribe chords and lyrics EXACTLY as performed in the video.`
+      : "";
 
-  let contextNote = "";
-  if (knownDetails?.title && knownDetails?.artist) {
-    contextNote = `\n\nCRITICAL CONTEXT: This has been identified as "${knownDetails.title}" by "${knownDetails.artist}".
-Perform a direct musical analysis of the provided guitar-stem audio.
-Transcribe chords and lyrics EXACTLY as performed. Use Google Search only to verify lyrics text.
-DO NOT copy a generic chord chart from the web — your analysis must reflect the actual guitar track.`;
-  }
-
-  const prompt = `CRITICAL AUDIO TRANSCRIPTION TASK:
-You are provided with a guitar-stem audio file (isolated by Demucs). Listen and transcribe.
+  const prompt = `You are a professional guitar transcription expert. Listen carefully to this YouTube video and transcribe the guitar chords and lyrics.
+${contextNote}
 
 TRANSCRIPTION PROTOCOL:
 1. Listen to the entire audio.
 2. Transcribe the lyrics word-for-word as sung.
-3. Identify the chords played on the acoustic guitar.
-4. Align chords above the lyrics.
-5. If the audio is silent or just noise, state that in performanceNotes and return empty lyrics.
-${contextNote}
+3. Identify ALL chords played on guitar throughout the song.
+4. Align chord names above the corresponding lyric syllables.
+5. Note any capo, tuning, or picking patterns.
 
-REQUIRED JSON STRUCTURE:
+Return ONLY a valid JSON object with this exact structure:
 {
   "title": "${knownDetails?.title || "Song Title"}",
   "artist": "${knownDetails?.artist || "Artist Name"}",
@@ -148,26 +108,23 @@ REQUIRED JSON STRUCTURE:
   "timeSignature": "4/4",
   "duration": 0,
   "keyChords": {"major": [], "minor": []},
-  "performanceNotes": "Detailed analysis of the audio performance."
-}
-
-${frontendInstructions}`;
+  "performanceNotes": "Detailed analysis of the performance."
+}`;
 
   const result = await genAI.models.generateContent({
     model: MODEL,
     contents: [
       {
         parts: [
-          { inlineData: { mimeType: "audio/wav", data: stemB64 } },
+          { fileData: { fileUri: youtubeUrl, mimeType: "video/mp4" } },
           { text: prompt },
         ],
       },
     ],
     config: {
       systemInstruction:
-        "You are a specialised audio-to-chord transcription engine. Your only input is the provided guitar-stem audio. Transcribe what is actually heard.",
-      tools: knownDetails ? [{ googleSearch: {} }] : [],
-      ...(knownDetails ? {} : { responseMimeType: "application/json" }),
+        "You are a professional guitar transcription expert. Analyse the provided YouTube video and return accurate chord and lyric transcriptions.",
+      responseMimeType: "application/json",
       maxOutputTokens: 8192,
       thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
     },
@@ -176,7 +133,6 @@ ${frontendInstructions}`;
   const text = result.text || "{}";
   const parsed = JSON.parse(cleanJsonResponse(text));
 
-  // Sanitise
   if (!Array.isArray(parsed.fingerings)) parsed.fingerings = [];
   parsed.fingerings = parsed.fingerings.map((f: any) => ({
     chord: f.chord || "Unknown",
@@ -275,14 +231,11 @@ export const analyzeTrack = onCall(
         youtubeUrl = ytUrl;
       }
 
-      // ── Call Modal.com for audio isolation ───────────────────────────────
-      await jobRef.update({ stage: "isolating", pct: 20 });
-      const stemB64 = await callModal(youtubeUrl);
-
-      // ── Call Gemini with guitar stem ─────────────────────────────────────
-      await jobRef.update({ stage: "analyzing", pct: 70 });
-      const analysis = await callGeminiWithStem(
-        stemB64,
+      // ── Call Gemini with YouTube URL (native video analysis) ────────────
+      // Uses Gemini's built-in YouTube support — no yt-dlp, no cloud IP blocks.
+      await jobRef.update({ stage: "analyzing", pct: 40 });
+      const analysis = await callGeminiWithYoutubeUrl(
+        youtubeUrl,
         geminiKey.value(),
         knownDetails
       );
