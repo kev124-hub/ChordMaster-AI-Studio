@@ -1,13 +1,12 @@
 import * as admin from "firebase-admin";
 import { onObjectFinalized } from "firebase-functions/v2/storage";
-import { defineSecret, defineString } from "firebase-functions/params";
+import { defineSecret } from "firebase-functions/params";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import axios from "axios";
 
 // Re-use the same secrets already declared in analyzeTrack.ts — Firebase
 // Functions deduplicates secrets by name, so we declare them locally here too.
 const geminiKey = defineSecret("GEMINI_API_KEY");
-const storageBucket = defineString("STORAGE_BUCKET");
 
 const MODEL = "gemini-2.5-pro";
 
@@ -137,7 +136,8 @@ STRICT RULES:
  */
 export const analyzeUpload = onObjectFinalized(
   {
-    bucket: storageBucket,
+    // No bucket specified → Firebase uses the project's default Storage bucket,
+    // which matches whatever VITE_FIREBASE_STORAGE_BUCKET the client uploads to.
     secrets: [geminiKey],
     memory: "1GiB",
     timeoutSeconds: 300,
