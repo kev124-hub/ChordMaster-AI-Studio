@@ -22,9 +22,9 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
       - name: Deploy Storage and Firestore rules
         run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_CHORDMASTER_AI_488702 }}' > /tmp/sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json npx firebase-tools@latest deploy \
+          npx firebase-tools@latest deploy \
             --only storage,firestore:rules \
+            --token '${{ secrets.FIREBASE_CI_TOKEN }}' \
             --project chordmaster-ai-488702
       - name: Deploy Firebase Functions
         continue-on-error: true
