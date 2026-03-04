@@ -9,7 +9,7 @@ import axios from "axios";
 const geminiKey = defineSecret("GEMINI_API_KEY");
 const storageBucket = defineString("STORAGE_BUCKET");
 
-const MODEL = "gemini-2.5-pro-preview";
+const MODEL = "gemini-2.5-pro";
 
 // ── Helpers (mirrors of analyzeTrack.ts — kept local to avoid circular deps) ─
 
