@@ -167,7 +167,7 @@ ${frontendInstructions}`;
       systemInstruction:
         "You are a specialised audio-to-chord transcription engine. Your only input is the provided guitar-stem audio. Transcribe what is actually heard.",
       tools: knownDetails ? [{ googleSearch: {} }] : [],
-      responseMimeType: "application/json",
+      ...(knownDetails ? {} : { responseMimeType: "application/json" }),
       maxOutputTokens: 8192,
       thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
     },
@@ -346,7 +346,6 @@ If you cannot identify the song, return {"title": "Unknown", "artist": "Unknown"
       ],
       config: {
         tools: [{ googleSearch: {} }, { urlContext: {} }],
-        responseMimeType: "application/json",
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
       },
     });
