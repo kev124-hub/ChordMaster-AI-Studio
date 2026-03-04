@@ -23,7 +23,7 @@ service cloud.firestore {
     // Each authenticated user may only read their own jobs.
     match /jobs/{jobId} {
       allow read: if request.auth != null
-        && resource.data.userId == request.auth.uid;
+        && (resource == null || resource.data.userId == request.auth.uid);
       allow write: if false;
     }
 
