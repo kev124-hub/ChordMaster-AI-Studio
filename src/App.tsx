@@ -334,7 +334,18 @@ export default function App() {
     // Cancel any previous listener
     jobUnsub.current?.();
     const jobRef = doc(db, 'jobs', jobId);
+
+    // Safety timeout: if the job doc hasn't been created within 2 minutes of
+    // the upload completing, the Storage trigger likely didn't fire.
+    const triggerTimeout = setTimeout(() => {
+      jobUnsub.current?.();
+      jobUnsub.current = null;
+      setError('The backend analysis trigger did not start. Check Firebase Functions logs or try again.');
+      setIsAnalyzing(false);
+    }, 120_000);
+
     jobUnsub.current = onSnapshot(jobRef, (snap) => {
+      clearTimeout(triggerTimeout); // job doc received — trigger fired
       if (!snap.exists()) return;
       const data = snap.data();
       setProgress(data.pct ?? 0);
@@ -357,6 +368,7 @@ export default function App() {
         jobUnsub.current = null;
       }
     }, (err) => {
+      clearTimeout(triggerTimeout);
       console.error('Job listener error:', err);
       setError('Lost connection to analysis job. Please try again.');
       setIsAnalyzing(false);
