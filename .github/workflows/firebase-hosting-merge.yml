@@ -22,17 +22,21 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
       - name: Install Functions dependencies
         run: npm --prefix functions install
+      - name: Write service account key
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_CHORDMASTER_AI_488702 }}' > /tmp/gcp-sa.json
       - name: Deploy Storage and Firestore rules
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-sa.json
         run: |
           npx firebase-tools@latest deploy \
             --only storage,firestore:rules \
-            --token '${{ secrets.FIREBASE_CI_TOKEN }}' \
             --project chordmaster-ai-488702
       - name: Deploy Firebase Functions
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-sa.json
         run: |
           npx firebase-tools@latest deploy \
             --only functions \
-            --token '${{ secrets.FIREBASE_CI_TOKEN }}' \
             --project chordmaster-ai-488702
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
