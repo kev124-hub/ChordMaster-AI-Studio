@@ -69,6 +69,8 @@ async function callModal(audioUrl: string): Promise<string> {
     );
   } catch (err: any) {
     const status = err?.response?.status;
+    const detail = err?.response?.data?.detail ?? err?.message ?? String(err);
+    console.error(`callModal error [status=${status ?? "no-response"}]:`, detail);
     throw new Error(
       status
         ? `Audio processing service error (${status}). The Modal service may be offline — redeploy it and try again.`
