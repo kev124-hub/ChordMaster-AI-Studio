@@ -125,7 +125,6 @@ STRICT RULES:
             tools: [],
             responseMimeType: "application/json",
             maxOutputTokens: 8192,
-            thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.HIGH },
         },
     });
     const text = result.text || "{}";

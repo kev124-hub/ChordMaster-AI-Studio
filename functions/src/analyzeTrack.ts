@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import axios from "axios";
 import { resolveSpotifyUrl } from "./spotifyLookup";
 import { resolveAppleUrl } from "./appleLookup";
@@ -126,7 +126,6 @@ Return ONLY a valid JSON object with this exact structure:
         "You are a professional guitar transcription expert. Analyse the provided YouTube video and return accurate chord and lyric transcriptions.",
       responseMimeType: "application/json",
       maxOutputTokens: 8192,
-      thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
     },
   });
 

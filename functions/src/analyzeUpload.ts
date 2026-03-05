@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 import { onObjectFinalized } from "firebase-functions/v2/storage";
 import { defineSecret } from "firebase-functions/params";
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import axios from "axios";
 
 // Re-use the same secrets already declared in analyzeTrack.ts — Firebase
@@ -106,7 +106,6 @@ STRICT RULES:
       tools: [],
       responseMimeType: "application/json",
       maxOutputTokens: 8192,
-      thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
     },
   });
 

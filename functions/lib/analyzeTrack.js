@@ -144,7 +144,6 @@ Return ONLY a valid JSON object with this exact structure:
             systemInstruction: "You are a professional guitar transcription expert. Analyse the provided YouTube video and return accurate chord and lyric transcriptions.",
             responseMimeType: "application/json",
             maxOutputTokens: 8192,
-            thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.HIGH },
         },
     });
     const text = result.text || "{}";
