@@ -51,6 +51,11 @@ image = (
         "torchaudio>=2.1.0",
         "requests>=2.31.0",
     )
+    # Pre-download the Demucs model weights into the image so cold starts
+    # don't need to fetch ~200 MB at request time (which can cause timeouts).
+    .run_commands(
+        "python -c \"from demucs.pretrained import get_model; get_model('htdemucs_ft')\""
+    )
 )
 
 app = modal.App("chordmaster-demucs", image=image)
@@ -151,43 +156,49 @@ def process_url(body: ProcessBody) -> dict[str, Any]:
     if not url:
         raise HTTPException(status_code=400, detail="url is required")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        raw_audio_path = os.path.join(tmpdir, "input.wav")
-        demucs_out_dir = os.path.join(tmpdir, "stems")
-        os.makedirs(demucs_out_dir, exist_ok=True)
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            raw_audio_path = os.path.join(tmpdir, "input.wav")
+            demucs_out_dir = os.path.join(tmpdir, "stems")
+            os.makedirs(demucs_out_dir, exist_ok=True)
 
-        # ── Step 1: Download ─────────────────────────────────────────────────
-        if _is_youtube_url(url):
-            _download_yt(url, raw_audio_path)
-        else:
-            _download_signed(url, raw_audio_path)
+            # ── Step 1: Download ─────────────────────────────────────────────
+            if _is_youtube_url(url):
+                _download_yt(url, raw_audio_path)
+            else:
+                _download_signed(url, raw_audio_path)
 
-        # ── Step 2: noisereduce (stationary noise) ───────────────────────────
-        audio, sr = librosa.load(raw_audio_path, sr=None, mono=False)
-        # noisereduce expects (samples,) for mono or (channels, samples) for stereo
-        if audio.ndim == 1:
-            audio_nr = nr.reduce_noise(y=audio, sr=sr, stationary=True, prop_decrease=0.75)
-        else:
-            # Process each channel independently
-            channels_nr = [
-                nr.reduce_noise(y=ch, sr=sr, stationary=True, prop_decrease=0.75)
-                for ch in audio
-            ]
-            audio_nr = np.stack(channels_nr)
+            # ── Step 2: noisereduce (stationary noise) ───────────────────────
+            audio, sr = librosa.load(raw_audio_path, sr=None, mono=False)
+            # noisereduce expects (samples,) for mono or (channels, samples) for stereo
+            if audio.ndim == 1:
+                audio_nr = nr.reduce_noise(y=audio, sr=sr, stationary=True, prop_decrease=0.75)
+            else:
+                # Process each channel independently
+                channels_nr = [
+                    nr.reduce_noise(y=ch, sr=sr, stationary=True, prop_decrease=0.75)
+                    for ch in audio
+                ]
+                audio_nr = np.stack(channels_nr)
 
-        # Save noise-reduced audio for Demucs
-        nr_path = os.path.join(tmpdir, "input_nr.wav")
-        sf.write(nr_path, audio_nr.T if audio_nr.ndim == 2 else audio_nr, sr)
+            # Save noise-reduced audio for Demucs
+            nr_path = os.path.join(tmpdir, "input_nr.wav")
+            sf.write(nr_path, audio_nr.T if audio_nr.ndim == 2 else audio_nr, sr)
 
-        # ── Step 3: Demucs stem separation ───────────────────────────────────
-        other_stem_path = _run_demucs(nr_path, demucs_out_dir)
+            # ── Step 3: Demucs stem separation ───────────────────────────────
+            other_stem_path = _run_demucs(nr_path, demucs_out_dir)
 
-        # ── Step 4: Resample to 16 kHz mono ──────────────────────────────────
-        stem_audio, stem_sr = librosa.load(str(other_stem_path), sr=TARGET_SR, mono=True)
+            # ── Step 4: Resample to 16 kHz mono ──────────────────────────────
+            stem_audio, stem_sr = librosa.load(str(other_stem_path), sr=TARGET_SR, mono=True)
 
-        wav_buffer = io.BytesIO()
-        sf.write(wav_buffer, stem_audio, TARGET_SR, format="WAV", subtype="PCM_16")
-        wav_bytes = wav_buffer.getvalue()
+            wav_buffer = io.BytesIO()
+            sf.write(wav_buffer, stem_audio, TARGET_SR, format="WAV", subtype="PCM_16")
+            wav_bytes = wav_buffer.getvalue()
 
-    stem_b64 = base64.b64encode(wav_bytes).decode("utf-8")
-    return {"stem_b64": stem_b64, "mime": "audio/wav"}
+        stem_b64 = base64.b64encode(wav_bytes).decode("utf-8")
+        return {"stem_b64": stem_b64, "mime": "audio/wav"}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
