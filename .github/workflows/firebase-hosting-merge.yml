@@ -31,14 +31,14 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-sa.json
         run: |
-          npx firebase-tools@latest deploy \
+          npx firebase-tools@15.8.0 deploy \
             --only storage,firestore:rules \
             --project chordmaster-ai-488702
       - name: Deploy Firebase Functions
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-sa.json
         run: |
-          npx firebase-tools@latest deploy \
+          npx firebase-tools@15.8.0 deploy \
             --only functions \
             --project chordmaster-ai-488702
       - uses: FirebaseExtended/action-hosting-deploy@v0
@@ -47,3 +47,4 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_CHORDMASTER_AI_488702 }}'
           channelId: live
           projectId: chordmaster-ai-488702
+          firebaseToolsVersion: 15.8.0
