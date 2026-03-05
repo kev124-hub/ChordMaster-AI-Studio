@@ -21,10 +21,18 @@ function stripNonAsciiOutsideStrings(s: string): string {
   let escape = false;
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
+    const code = c.charCodeAt(0);
     if (escape) { result += c; escape = false; continue; }
     if (c === "\\") { result += c; escape = true; continue; }
     if (c === '"') { inString = !inString; result += c; continue; }
-    if (!inString && c.charCodeAt(0) > 127) continue; // skip non-ASCII outside strings
+    if (!inString && code > 127) continue; // skip non-ASCII outside strings
+    if (inString && code < 32) {
+      // Escape literal control characters — JSON requires these to be escaped
+      if (code === 10) { result += "\\n"; continue; }
+      if (code === 13) { result += "\\r"; continue; }
+      if (code === 9)  { result += "\\t"; continue; }
+      continue; // drop other control chars (SOH, STX, etc.)
+    }
     result += c;
   }
   return result;
