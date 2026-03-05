@@ -47,6 +47,36 @@ const axios_1 = __importDefault(require("axios"));
 const geminiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
 const MODEL = "gemini-2.5-pro";
 // ── Helpers (mirrors of analyzeTrack.ts — kept local to avoid circular deps) ─
+/** Strip non-ASCII characters that appear outside JSON string values.
+ *  Gemini thinking tokens (e.g. Cyrillic) occasionally leak into the
+ *  structural parts of the response and break JSON.parse. */
+function stripNonAsciiOutsideStrings(s) {
+    let result = "";
+    let inString = false;
+    let escape = false;
+    for (let i = 0; i < s.length; i++) {
+        const c = s[i];
+        if (escape) {
+            result += c;
+            escape = false;
+            continue;
+        }
+        if (c === "\\") {
+            result += c;
+            escape = true;
+            continue;
+        }
+        if (c === '"') {
+            inString = !inString;
+            result += c;
+            continue;
+        }
+        if (!inString && c.charCodeAt(0) > 127)
+            continue; // skip non-ASCII outside strings
+        result += c;
+    }
+    return result;
+}
 function cleanJsonResponse(text) {
     let cleaned = text.replace(/```json|```/gi, "").trim();
     if (!cleaned.startsWith("{") && !cleaned.startsWith("[")) {
@@ -56,17 +86,26 @@ function cleanJsonResponse(text) {
             cleaned = cleaned.substring(start, end + 1);
         }
     }
-    return cleaned;
+    return stripNonAsciiOutsideStrings(cleaned);
 }
 async function callModal(audioUrl) {
     const modalEndpoint = process.env.MODAL_ENDPOINT;
     if (!modalEndpoint) {
         throw new Error("MODAL_ENDPOINT environment variable is not set. Deploy the Modal service first.");
     }
-    const resp = await axios_1.default.post(modalEndpoint, { url: audioUrl }, {
-        headers: { "Content-Type": "application/json" },
-        timeout: 180000, // 3 min for Demucs
-    });
+    let resp;
+    try {
+        resp = await axios_1.default.post(modalEndpoint, { url: audioUrl }, {
+            headers: { "Content-Type": "application/json" },
+            timeout: 180000, // 3 min for Demucs
+        });
+    }
+    catch (err) {
+        const status = err?.response?.status;
+        throw new Error(status
+            ? `Audio processing service error (${status}). The Modal service may be offline — redeploy it and try again.`
+            : "Audio processing service is unreachable. The Modal service may be offline — redeploy it and try again.");
+    }
     const stemB64 = resp.data.stem_b64;
     if (!stemB64)
         throw new Error("Modal.com returned no stem data.");
