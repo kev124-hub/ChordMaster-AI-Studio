@@ -4,8 +4,11 @@ service cloud.firestore {
 
     // ── User song library ────────────────────────────────────────────────────
     match /songs/{songId} {
-      // Owner can read/write their own songs
-      allow read, write: if request.auth != null
+      // Owner can create a song (resource is null on create, so check request.resource)
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.userId;
+      // Owner can read/update/delete their own songs
+      allow read, update, delete: if request.auth != null
         && request.auth.uid == resource.data.userId;
       // Anyone can read a song that has been explicitly shared
       allow read: if resource.data.isShared == true;
