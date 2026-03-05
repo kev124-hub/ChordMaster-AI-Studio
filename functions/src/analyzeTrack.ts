@@ -270,7 +270,7 @@ export const identifySong = onCall(
   {
     secrets: [geminiKey],
     memory: "512MiB",
-    timeoutSeconds: 60,
+    timeoutSeconds: 120,
     region: "us-central1",
   },
   async (request) => {
@@ -283,31 +283,44 @@ export const identifySong = onCall(
 
     const genAI = new GoogleGenAI({ apiKey: geminiKey.value() });
 
-    const result = await genAI.models.generateContent({
-      model: MODEL,
-      contents: [
-        {
-          parts: [
-            {
-              text: `Identify the song at this URL: ${url}.
-Use Google Search and URL Context to find the track title and artist.
+    console.log(`identifySong called for url: ${url}`);
+
+    try {
+      const result = await genAI.models.generateContent({
+        model: MODEL,
+        contents: [
+          {
+            parts: [
+              {
+                text: `Identify the song at this URL: ${url}.
+Use Google Search to find the track title and artist name.
 Return ONLY a JSON object: {"title": "", "artist": "", "chords": [], "fingerings": []}.
 If you cannot identify the song, return {"title": "Unknown", "artist": "Unknown", "chords": [], "fingerings": []}.`,
-            },
-          ],
+              },
+            ],
+          },
+        ],
+        config: {
+          // googleSearch only — urlContext is excluded because Spotify and Apple
+          // Music URLs require authentication and return login redirects,
+          // causing urlContext to fail or stall. googleSearch works for all platforms.
+          tools: [{ googleSearch: {} }],
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         },
-      ],
-      config: {
-        tools: [{ googleSearch: {} }, { urlContext: {} }],
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-      },
-    });
+      });
 
-    const text = result.text || "{}";
-    try {
-      return JSON.parse(cleanJsonResponse(text));
-    } catch {
-      return { title: "Unknown", artist: "Unknown", chords: [], fingerings: [] };
+      console.log(`identifySong raw response: ${result.text?.slice(0, 200)}`);
+
+      const text = result.text || "{}";
+      try {
+        return JSON.parse(cleanJsonResponse(text));
+      } catch {
+        return { title: "Unknown", artist: "Unknown", chords: [], fingerings: [] };
+      }
+    } catch (err: any) {
+      const detail = err?.message || String(err);
+      console.error(`identifySong Gemini error [model=${MODEL}]:`, detail);
+      throw new HttpsError("internal", `Song identification failed: ${detail}`);
     }
   }
 );

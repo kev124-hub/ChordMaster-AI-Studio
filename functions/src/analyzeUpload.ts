@@ -148,6 +148,8 @@ export const analyzeUpload = onObjectFinalized(
     const contentType: string = event.data.contentType ?? "";
     const bucket = event.data.bucket;
 
+    console.log(`analyzeUpload triggered: bucket=${bucket} path=${filePath} type=${contentType}`);
+
     // Only process files under uploads/
     if (!filePath.startsWith("uploads/")) return;
 
