@@ -270,7 +270,7 @@ export const identifySong = onCall(
   {
     secrets: [geminiKey],
     memory: "512MiB",
-    timeoutSeconds: 60,
+    timeoutSeconds: 120,
     region: "us-central1",
   },
   async (request) => {
@@ -290,7 +290,7 @@ export const identifySong = onCall(
           parts: [
             {
               text: `Identify the song at this URL: ${url}.
-Use Google Search and URL Context to find the track title and artist.
+Use Google Search to find the track title and artist name.
 Return ONLY a JSON object: {"title": "", "artist": "", "chords": [], "fingerings": []}.
 If you cannot identify the song, return {"title": "Unknown", "artist": "Unknown", "chords": [], "fingerings": []}.`,
             },
@@ -298,7 +298,10 @@ If you cannot identify the song, return {"title": "Unknown", "artist": "Unknown"
         },
       ],
       config: {
-        tools: [{ googleSearch: {} }, { urlContext: {} }],
+        // googleSearch only — urlContext is excluded because Spotify and Apple
+        // Music URLs require authentication and return login redirects,
+        // causing urlContext to fail or stall. googleSearch works for all platforms.
+        tools: [{ googleSearch: {} }],
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
       },
     });
