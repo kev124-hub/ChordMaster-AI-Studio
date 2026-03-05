@@ -305,7 +305,6 @@ If you cannot identify the song, return {"title": "Unknown", "artist": "Unknown"
           // Music URLs require authentication and return login redirects,
           // causing urlContext to fail or stall. googleSearch works for all platforms.
           tools: [{ googleSearch: {} }],
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         },
       });
 

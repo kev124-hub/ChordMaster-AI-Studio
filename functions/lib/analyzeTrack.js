@@ -49,7 +49,7 @@ exports.geminiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
 exports.spotifyClientId = (0, params_1.defineSecret)("SPOTIFY_CLIENT_ID");
 exports.spotifyClientSecret = (0, params_1.defineSecret)("SPOTIFY_CLIENT_SECRET");
 exports.youtubeDataApiKey = (0, params_1.defineSecret)("YOUTUBE_DATA_API_KEY");
-const MODEL = "gemini-2.5-pro-preview-05-06";
+const MODEL = "gemini-2.5-pro";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function cleanJsonResponse(text) {
     let cleaned = text.replace(/```json|```/gi, "").trim();
@@ -94,53 +94,26 @@ async function searchYoutube(query, apiKey) {
     return `https://www.youtube.com/watch?v=${items[0].id.videoId}`;
 }
 /**
- * Call Modal.com to download audio from a URL, run noisereduce + Demucs,
- * and return the guitar-stem WAV as base64.
+ * Call Gemini with a YouTube URL using native video analysis (no yt-dlp needed).
+ * Gemini processes YouTube URLs directly from Google's infrastructure,
+ * avoiding cloud IP blocks that affect yt-dlp downloads.
  */
-async function callModal(audioUrl) {
-    const modalEndpoint = process.env.MODAL_ENDPOINT;
-    if (!modalEndpoint) {
-        throw new https_1.HttpsError("failed-precondition", "MODAL_ENDPOINT environment variable is not set. Deploy the Modal service and set MODAL_ENDPOINT.");
-    }
-    const resp = await axios_1.default.post(modalEndpoint, { url: audioUrl }, {
-        headers: { "Content-Type": "application/json" },
-        timeout: 180000, // 3 minutes for Demucs
-    });
-    const stemB64 = resp.data.stem_b64;
-    if (!stemB64) {
-        throw new https_1.HttpsError("internal", "Modal.com returned no stem data.");
-    }
-    return stemB64;
-}
-/** Call Gemini with a guitar-stem WAV (base64) and return parsed SongAnalysis */
-async function callGeminiWithStem(stemB64, apiKey, knownDetails) {
+async function callGeminiWithYoutubeUrl(youtubeUrl, apiKey, knownDetails) {
     const genAI = new genai_1.GoogleGenAI({ apiKey });
-    const frontendInstructions = `
-STRICT TRANSCRIPTION RULES:
-1. Listen to the provided audio. It is the ONLY source for chords.
-2. Transcribe the lyrics word-for-word. Do not summarise.
-3. Identify chords played on the acoustic guitar.
-4. If the audio is silent or just noise, state that in performanceNotes.
-5. Never use external lyrics for uploaded audio files.`;
-    let contextNote = "";
-    if (knownDetails?.title && knownDetails?.artist) {
-        contextNote = `\n\nCRITICAL CONTEXT: This has been identified as "${knownDetails.title}" by "${knownDetails.artist}".
-Perform a direct musical analysis of the provided guitar-stem audio.
-Transcribe chords and lyrics EXACTLY as performed. Use Google Search only to verify lyrics text.
-DO NOT copy a generic chord chart from the web — your analysis must reflect the actual guitar track.`;
-    }
-    const prompt = `CRITICAL AUDIO TRANSCRIPTION TASK:
-You are provided with a guitar-stem audio file (isolated by Demucs). Listen and transcribe.
+    const contextNote = knownDetails?.title && knownDetails?.artist
+        ? `\n\nCONTEXT: This has been identified as "${knownDetails.title}" by "${knownDetails.artist}". Transcribe chords and lyrics EXACTLY as performed in the video.`
+        : "";
+    const prompt = `You are a professional guitar transcription expert. Listen carefully to this YouTube video and transcribe the guitar chords and lyrics.
+${contextNote}
 
 TRANSCRIPTION PROTOCOL:
 1. Listen to the entire audio.
 2. Transcribe the lyrics word-for-word as sung.
-3. Identify the chords played on the acoustic guitar.
-4. Align chords above the lyrics.
-5. If the audio is silent or just noise, state that in performanceNotes and return empty lyrics.
-${contextNote}
+3. Identify ALL chords played on guitar throughout the song.
+4. Align chord names above the corresponding lyric syllables.
+5. Note any capo, tuning, or picking patterns.
 
-REQUIRED JSON STRUCTURE:
+Return ONLY a valid JSON object with this exact structure:
 {
   "title": "${knownDetails?.title || "Song Title"}",
   "artist": "${knownDetails?.artist || "Artist Name"}",
@@ -155,23 +128,20 @@ REQUIRED JSON STRUCTURE:
   "timeSignature": "4/4",
   "duration": 0,
   "keyChords": {"major": [], "minor": []},
-  "performanceNotes": "Detailed analysis of the audio performance."
-}
-
-${frontendInstructions}`;
+  "performanceNotes": "Detailed analysis of the performance."
+}`;
     const result = await genAI.models.generateContent({
         model: MODEL,
         contents: [
             {
                 parts: [
-                    { inlineData: { mimeType: "audio/wav", data: stemB64 } },
+                    { fileData: { fileUri: youtubeUrl, mimeType: "video/mp4" } },
                     { text: prompt },
                 ],
             },
         ],
         config: {
-            systemInstruction: "You are a specialised audio-to-chord transcription engine. Your only input is the provided guitar-stem audio. Transcribe what is actually heard.",
-            tools: knownDetails ? [{ googleSearch: {} }] : [],
+            systemInstruction: "You are a professional guitar transcription expert. Analyse the provided YouTube video and return accurate chord and lyric transcriptions.",
             responseMimeType: "application/json",
             maxOutputTokens: 8192,
             thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.HIGH },
@@ -179,7 +149,6 @@ ${frontendInstructions}`;
     });
     const text = result.text || "{}";
     const parsed = JSON.parse(cleanJsonResponse(text));
-    // Sanitise
     if (!Array.isArray(parsed.fingerings))
         parsed.fingerings = [];
     parsed.fingerings = parsed.fingerings.map((f) => ({
@@ -252,12 +221,10 @@ exports.analyzeTrack = (0, https_1.onCall)({
             }
             youtubeUrl = ytUrl;
         }
-        // ── Call Modal.com for audio isolation ───────────────────────────────
-        await jobRef.update({ stage: "isolating", pct: 20 });
-        const stemB64 = await callModal(youtubeUrl);
-        // ── Call Gemini with guitar stem ─────────────────────────────────────
-        await jobRef.update({ stage: "analyzing", pct: 70 });
-        const analysis = await callGeminiWithStem(stemB64, exports.geminiKey.value(), knownDetails);
+        // ── Call Gemini with YouTube URL (native video analysis) ────────────
+        // Uses Gemini's built-in YouTube support — no yt-dlp, no cloud IP blocks.
+        await jobRef.update({ stage: "analyzing", pct: 40 });
+        const analysis = await callGeminiWithYoutubeUrl(youtubeUrl, exports.geminiKey.value(), knownDetails);
         // ── Write result ─────────────────────────────────────────────────────
         await jobRef.update({ stage: "complete", pct: 100, result: analysis });
         // Cache the result
@@ -282,7 +249,7 @@ exports.analyzeTrack = (0, https_1.onCall)({
 exports.identifySong = (0, https_1.onCall)({
     secrets: [exports.geminiKey],
     memory: "512MiB",
-    timeoutSeconds: 60,
+    timeoutSeconds: 120,
     region: "us-central1",
 }, async (request) => {
     if (!request.auth) {
@@ -292,32 +259,42 @@ exports.identifySong = (0, https_1.onCall)({
     if (!url)
         throw new https_1.HttpsError("invalid-argument", "url is required.");
     const genAI = new genai_1.GoogleGenAI({ apiKey: exports.geminiKey.value() });
-    const result = await genAI.models.generateContent({
-        model: MODEL,
-        contents: [
-            {
-                parts: [
-                    {
-                        text: `Identify the song at this URL: ${url}.
-Use Google Search and URL Context to find the track title and artist.
+    console.log(`identifySong called for url: ${url}`);
+    try {
+        const result = await genAI.models.generateContent({
+            model: MODEL,
+            contents: [
+                {
+                    parts: [
+                        {
+                            text: `Identify the song at this URL: ${url}.
+Use Google Search to find the track title and artist name.
 Return ONLY a JSON object: {"title": "", "artist": "", "chords": [], "fingerings": []}.
 If you cannot identify the song, return {"title": "Unknown", "artist": "Unknown", "chords": [], "fingerings": []}.`,
-                    },
-                ],
+                        },
+                    ],
+                },
+            ],
+            config: {
+                // googleSearch only — urlContext is excluded because Spotify and Apple
+                // Music URLs require authentication and return login redirects,
+                // causing urlContext to fail or stall. googleSearch works for all platforms.
+                tools: [{ googleSearch: {} }],
             },
-        ],
-        config: {
-            tools: [{ googleSearch: {} }, { urlContext: {} }],
-            responseMimeType: "application/json",
-            thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.LOW },
-        },
-    });
-    const text = result.text || "{}";
-    try {
-        return JSON.parse(cleanJsonResponse(text));
+        });
+        console.log(`identifySong raw response: ${result.text?.slice(0, 200)}`);
+        const text = result.text || "{}";
+        try {
+            return JSON.parse(cleanJsonResponse(text));
+        }
+        catch {
+            return { title: "Unknown", artist: "Unknown", chords: [], fingerings: [] };
+        }
     }
-    catch {
-        return { title: "Unknown", artist: "Unknown", chords: [], fingerings: [] };
+    catch (err) {
+        const detail = err?.message || String(err);
+        console.error(`identifySong Gemini error [model=${MODEL}]:`, detail);
+        throw new https_1.HttpsError("internal", `Song identification failed: ${detail}`);
     }
 });
 //# sourceMappingURL=analyzeTrack.js.map
