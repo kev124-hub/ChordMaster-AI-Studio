@@ -45,8 +45,7 @@ const axios_1 = __importDefault(require("axios"));
 // Re-use the same secrets already declared in analyzeTrack.ts — Firebase
 // Functions deduplicates secrets by name, so we declare them locally here too.
 const geminiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
-const storageBucket = (0, params_1.defineString)("STORAGE_BUCKET");
-const MODEL = "gemini-2.5-pro-preview-05-06";
+const MODEL = "gemini-2.5-pro";
 // ── Helpers (mirrors of analyzeTrack.ts — kept local to avoid circular deps) ─
 function cleanJsonResponse(text) {
     let cleaned = text.replace(/```json|```/gi, "").trim();
@@ -153,7 +152,8 @@ STRICT RULES:
  * be set by the client on the upload task.
  */
 exports.analyzeUpload = (0, storage_1.onObjectFinalized)({
-    bucket: storageBucket,
+    // No bucket specified → Firebase uses the project's default Storage bucket,
+    // which matches whatever VITE_FIREBASE_STORAGE_BUCKET the client uploads to.
     secrets: [geminiKey],
     memory: "1GiB",
     timeoutSeconds: 300,
@@ -162,6 +162,7 @@ exports.analyzeUpload = (0, storage_1.onObjectFinalized)({
     const filePath = event.data.name ?? "";
     const contentType = event.data.contentType ?? "";
     const bucket = event.data.bucket;
+    console.log(`analyzeUpload triggered: bucket=${bucket} path=${filePath} type=${contentType}`);
     // Only process files under uploads/
     if (!filePath.startsWith("uploads/"))
         return;
@@ -171,10 +172,13 @@ exports.analyzeUpload = (0, storage_1.onObjectFinalized)({
         return;
     const userId = segments[1];
     const fileSegment = segments.slice(2).join("/");
-    const underscoreIdx = fileSegment.indexOf("_");
-    if (underscoreIdx === -1)
+    const firstUnderscore = fileSegment.indexOf("_");
+    if (firstUnderscore === -1)
         return;
-    const jobId = fileSegment.substring(0, underscoreIdx);
+    const secondUnderscore = fileSegment.indexOf("_", firstUnderscore + 1);
+    if (secondUnderscore === -1)
+        return;
+    const jobId = fileSegment.substring(0, secondUnderscore);
     // Read optional known details from custom metadata
     const metadata = event.data.metadata ?? {};
     const knownDetails = metadata.manualTitle && metadata.manualArtist
