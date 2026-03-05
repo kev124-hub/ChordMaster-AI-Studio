@@ -16,6 +16,24 @@ const MODEL = "gemini-2.5-pro";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Strip non-ASCII characters that appear outside JSON string values.
+ *  Gemini thinking tokens (e.g. Cyrillic) occasionally leak into the
+ *  structural parts of the response and break JSON.parse. */
+function stripNonAsciiOutsideStrings(s: string): string {
+  let result = "";
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escape) { result += c; escape = false; continue; }
+    if (c === "\\") { result += c; escape = true; continue; }
+    if (c === '"') { inString = !inString; result += c; continue; }
+    if (!inString && c.charCodeAt(0) > 127) continue; // skip non-ASCII outside strings
+    result += c;
+  }
+  return result;
+}
+
 function cleanJsonResponse(text: string): string {
   let cleaned = text.replace(/```json|```/gi, "").trim();
   if (!cleaned.startsWith("{") && !cleaned.startsWith("[")) {
@@ -25,7 +43,7 @@ function cleanJsonResponse(text: string): string {
       cleaned = cleaned.substring(start, end + 1);
     }
   }
-  return cleaned;
+  return stripNonAsciiOutsideStrings(cleaned);
 }
 
 /** Detect and normalise platform from URL */
