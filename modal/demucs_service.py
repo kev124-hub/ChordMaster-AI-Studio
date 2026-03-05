@@ -30,6 +30,8 @@ from pathlib import Path
 from typing import Any
 
 import modal
+from fastapi import HTTPException
+from pydantic import BaseModel
 
 # ── Image ─────────────────────────────────────────────────────────────────────
 # Build the container image with all required Python packages and system tools.
@@ -52,6 +54,11 @@ image = (
 )
 
 app = modal.App("chordmaster-demucs", image=image)
+
+
+class ProcessBody(BaseModel):
+    url: str
+
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 TARGET_SR = 16_000  # Gemini works best with 16 kHz
@@ -130,7 +137,7 @@ def _run_demucs(input_wav: str, out_dir: str) -> Path:
     memory=8192,
 )
 @modal.fastapi_endpoint(method="POST")
-def process_url(body: dict[str, Any]) -> dict[str, Any]:
+def process_url(body: ProcessBody) -> dict[str, Any]:
     """
     POST body: { "url": "<youtube-or-signed-url>" }
     Response:  { "stem_b64": "<base64 WAV>", "mime": "audio/wav" }
@@ -140,9 +147,9 @@ def process_url(body: dict[str, Any]) -> dict[str, Any]:
     import librosa
     import soundfile as sf
 
-    url: str = body.get("url", "")
+    url: str = body.url
     if not url:
-        return {"error": "url is required"}, 400  # type: ignore[return-value]
+        raise HTTPException(status_code=400, detail="url is required")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         raw_audio_path = os.path.join(tmpdir, "input.wav")
