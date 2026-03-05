@@ -117,7 +117,7 @@ def _run_demucs(input_wav: str, out_dir: str) -> Path:
         "--out", out_dir,
         input_wav,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=150)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
     if result.returncode != 0:
         raise RuntimeError(f"Demucs failed: {result.stderr[:500]}")
 
@@ -138,7 +138,7 @@ def _run_demucs(input_wav: str, out_dir: str) -> Path:
 
 @app.function(
     gpu="A10G",
-    timeout=180,
+    timeout=300,
     memory=8192,
 )
 @modal.fastapi_endpoint(method="POST")

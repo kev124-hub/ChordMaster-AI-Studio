@@ -4,7 +4,7 @@ import { defineSecret } from "firebase-functions/params";
 import { GoogleGenAI } from "@google/genai";
 import axios from "axios";
 import { resolveSpotifyUrl } from "./spotifyLookup";
-import { resolveAppleUrl } from "./appleLookup";
+import { resolveAppleUrl, getAppleTrackDetails } from "./appleLookup";
 
 // ── Secrets ───────────────────────────────────────────────────────────────────
 export const geminiKey = defineSecret("GEMINI_API_KEY");
@@ -227,15 +227,18 @@ export const analyzeTrack = onCall(
 
       if (platform === "spotify") {
         await jobRef.update({ stage: "resolving", pct: 10 });
-        const isrc = await resolveSpotifyUrl(
+        const spotifyDetails = await resolveSpotifyUrl(
           url,
           spotifyClientId.value(),
           spotifyClientSecret.value()
         );
-        const ytUrl = await searchYoutube(
-          isrc ? `isrc:${isrc}` : url,
-          youtubeDataApiKey.value()
-        );
+        // Prefer ISRC (exact match); fall back to title + artist text search
+        const searchQuery = spotifyDetails?.isrc
+          ? `isrc:${spotifyDetails.isrc}`
+          : spotifyDetails?.trackName && spotifyDetails?.artistName
+            ? `${spotifyDetails.trackName} ${spotifyDetails.artistName} official`
+            : url;
+        const ytUrl = await searchYoutube(searchQuery, youtubeDataApiKey.value());
         if (!ytUrl) {
           throw new HttpsError(
             "not-found",
@@ -293,7 +296,7 @@ export const analyzeTrack = onCall(
 
 export const identifySong = onCall(
   {
-    secrets: [geminiKey],
+    secrets: [geminiKey, spotifyClientId, spotifyClientSecret],
     memory: "512MiB",
     timeoutSeconds: 120,
     region: "us-central1",
@@ -306,9 +309,39 @@ export const identifySong = onCall(
     const { url } = request.data as { url: string };
     if (!url) throw new HttpsError("invalid-argument", "url is required.");
 
-    const genAI = new GoogleGenAI({ apiKey: geminiKey.value() });
-
     console.log(`identifySong called for url: ${url}`);
+
+    // ── Direct API lookups (more reliable than Gemini search for streaming URLs) ─
+    const platform = detectPlatform(url);
+
+    if (platform === "apple") {
+      try {
+        const details = await getAppleTrackDetails(url);
+        if (details) {
+          return { title: details.trackName, artist: details.artistName, chords: [], fingerings: [] };
+        }
+      } catch {
+        // Fall through to Gemini
+      }
+    }
+
+    if (platform === "spotify") {
+      try {
+        const details = await resolveSpotifyUrl(
+          url,
+          spotifyClientId.value(),
+          spotifyClientSecret.value()
+        );
+        if (details?.trackName && details?.artistName) {
+          return { title: details.trackName, artist: details.artistName, chords: [], fingerings: [] };
+        }
+      } catch {
+        // Fall through to Gemini
+      }
+    }
+
+    // ── Gemini + Google Search fallback (YouTube and unknown platforms) ────────
+    const genAI = new GoogleGenAI({ apiKey: geminiKey.value() });
 
     try {
       const result = await genAI.models.generateContent({

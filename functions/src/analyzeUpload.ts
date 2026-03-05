@@ -64,7 +64,7 @@ async function callModal(audioUrl: string): Promise<string> {
       { url: audioUrl },
       {
         headers: { "Content-Type": "application/json" },
-        timeout: 180000, // 3 min for Demucs
+        timeout: 270_000, // 4.5 min — must be less than the 300 s Firebase function timeout
       }
     );
   } catch (err: any) {
