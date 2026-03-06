@@ -55,7 +55,9 @@ image = (
     )
     # Pre-download the Demucs model weights into /opt/demucs_cache so they are
     # baked into the image layer and never fetched at request time.
-    .env({"TORCH_HOME": "/opt/demucs_cache"})
+    # MODAL_BUILD_DATE is a cache-busting sentinel — change it to force a full
+    # image rebuild (e.g. after removing packages like librosa/soundfile).
+    .env({"TORCH_HOME": "/opt/demucs_cache", "MODAL_BUILD_DATE": "2026-03-06"})
     .run_commands(
         "TORCH_HOME=/opt/demucs_cache python -c "
         "\"from demucs.pretrained import get_model; get_model('htdemucs_ft')\""
