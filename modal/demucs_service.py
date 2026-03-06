@@ -30,7 +30,6 @@ from pathlib import Path
 from typing import Any
 
 import modal
-from fastapi import HTTPException
 from pydantic import BaseModel
 
 # ── Image ─────────────────────────────────────────────────────────────────────
@@ -154,6 +153,7 @@ def process_url(body: ProcessBody) -> dict[str, Any]:
     POST body: { "url": "<youtube-or-signed-url>" }
     Response:  { "stem_b64": "<base64 WAV>", "mime": "audio/wav" }
     """
+    from fastapi import HTTPException
     import numpy as np
     import noisereduce as nr
     import librosa
