@@ -22,7 +22,6 @@ Authentication: the Firebase Function passes a base64-encoded
 """
 
 import base64
-import io
 import os
 import subprocess
 import tempfile
@@ -37,18 +36,19 @@ except ImportError:  # local env may not have pydantic; container always does
 
 # ── Image ─────────────────────────────────────────────────────────────────────
 # Build the container image with all required Python packages and system tools.
+# Note: audio I/O is handled entirely via torchaudio (ffmpeg backend) to avoid
+# libsndfile/soundfile compatibility issues across cffi versions.
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("ffmpeg", "libsndfile1")
+    .apt_install("ffmpeg")
     .pip_install(
         "fastapi[standard]>=0.115.0",
         "yt-dlp>=2024.1.0",
         "demucs>=4.0.0",
         "noisereduce>=3.0.0",
-        "librosa>=0.10.0",
-        "soundfile==0.12.1",  # 0.13+ uses cffi which breaks with cffi>=2.0
         "numpy>=1.24.0",
+        "scipy>=1.10.0",
         "torch>=2.1.0",
         "torchaudio>=2.1.0",
         "requests>=2.31.0",
@@ -76,11 +76,8 @@ DEMUCS_MODEL = "htdemucs_ft"  # Fine-tuned hybrid transformer — best quality
 
 # ── Helper: download audio ────────────────────────────────────────────────────
 
-def _download_yt(url: str, out_path: str) -> str:
+def _download_yt(url: str, out_dir: str) -> str:
     """Download audio from a YouTube URL using yt-dlp. Returns actual output path."""
-    # Use a template without extension; yt-dlp will append the correct one after
-    # format conversion. We then glob for the resulting file.
-    out_dir = str(Path(out_path).parent)
     template = os.path.join(out_dir, "yt_audio.%(ext)s")
     cmd = [
         "yt-dlp",
@@ -94,7 +91,6 @@ def _download_yt(url: str, out_path: str) -> str:
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
         raise RuntimeError(f"yt-dlp failed: {result.stderr[:500]}")
-    # Find what yt-dlp actually wrote
     candidates = list(Path(out_dir).glob("yt_audio.*"))
     if not candidates:
         raise RuntimeError("yt-dlp produced no output file")
@@ -134,19 +130,17 @@ def _run_demucs(input_wav: str, out_dir: str) -> Path:
     env["TORCH_HOME"] = "/opt/demucs_cache"
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=240, env=env)
     if result.returncode != 0:
-        # Use the tail of stderr (progress bars fill the head; errors are at the end).
-        # Include stdout too in case Demucs printed the error there.
         tail = (result.stderr + result.stdout)[-3000:]
         raise RuntimeError(f"Demucs failed (rc={result.returncode}): {tail}")
 
-    # Find the output file: {out_dir}/{model}/{stem_name}/no_vocals.wav
+    # Demucs output: {out_dir}/{model}/{input_stem}/no_vocals.wav
     input_stem = Path(input_wav).stem
     other_path = Path(out_dir) / DEMUCS_MODEL / input_stem / "no_vocals.wav"
     if not other_path.exists():
-        # Fallback: walk and find any no_vocals.wav
         candidates = list(Path(out_dir).rglob("no_vocals.wav"))
         if not candidates:
-            raise RuntimeError("Demucs produced no output file.")
+            all_files = list(Path(out_dir).rglob("*"))
+            raise RuntimeError(f"Demucs produced no output. Files found: {all_files}")
         other_path = candidates[0]
 
     return other_path
@@ -165,11 +159,13 @@ def process_url(body: ProcessBody) -> dict[str, Any]:
     POST body: { "url": "<youtube-or-signed-url>" }
     Response:  { "stem_b64": "<base64 WAV>", "mime": "audio/wav" }
     """
+    import traceback
     from fastapi import HTTPException
     import numpy as np
     import noisereduce as nr
-    import librosa
-    import soundfile as sf
+    import torch
+    import torchaudio
+    import torchaudio.functional as TAF
 
     url: str = body.url
     if not url:
@@ -177,49 +173,69 @@ def process_url(body: ProcessBody) -> dict[str, Any]:
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
-            raw_audio_path = os.path.join(tmpdir, "input.wav")
             demucs_out_dir = os.path.join(tmpdir, "stems")
             os.makedirs(demucs_out_dir, exist_ok=True)
 
             # ── Step 1: Download ─────────────────────────────────────────────
+            print("[1] Downloading audio…", flush=True)
             if _is_youtube_url(url):
-                raw_audio_path = _download_yt(url, raw_audio_path)
+                raw_audio_path = _download_yt(url, tmpdir)
             else:
+                raw_audio_path = os.path.join(tmpdir, "input.wav")
                 _download_signed(url, raw_audio_path)
+            print(f"[1] Downloaded: {raw_audio_path}", flush=True)
 
-            # ── Step 2: noisereduce (stationary noise) ───────────────────────
-            audio, sr = librosa.load(raw_audio_path, sr=None, mono=False)
-            # noisereduce expects (samples,) for mono or (channels, samples) for stereo
-            if audio.ndim == 1:
-                audio_nr = nr.reduce_noise(y=audio, sr=sr, stationary=True, prop_decrease=0.75)
+            # ── Step 2: Load audio via torchaudio (ffmpeg backend) ───────────
+            print("[2] Loading audio…", flush=True)
+            waveform, sr = torchaudio.load(raw_audio_path)
+            # waveform: (channels, samples) float32 in [-1, 1]
+            audio = waveform.numpy()
+            print(f"[2] Loaded: shape={audio.shape}, sr={sr}", flush=True)
+
+            # ── Step 3: noisereduce ───────────────────────────────────────────
+            print("[3] Running noisereduce…", flush=True)
+            if audio.shape[0] == 1:
+                audio_nr = nr.reduce_noise(
+                    y=audio[0], sr=sr, stationary=True, prop_decrease=0.75
+                )
+                audio_nr = audio_nr[np.newaxis, :]
             else:
-                # Process each channel independently
                 channels_nr = [
                     nr.reduce_noise(y=ch, sr=sr, stationary=True, prop_decrease=0.75)
                     for ch in audio
                 ]
                 audio_nr = np.stack(channels_nr)
+            print(f"[3] Noisereduce done: shape={audio_nr.shape}", flush=True)
 
-            # Save noise-reduced audio for Demucs
+            # Save noise-reduced audio for Demucs (torchaudio → no soundfile needed)
             nr_path = os.path.join(tmpdir, "input_nr.wav")
-            sf.write(nr_path, audio_nr.T if audio_nr.ndim == 2 else audio_nr, sr)
+            torchaudio.save(nr_path, torch.from_numpy(audio_nr.astype(np.float32)), sr)
+            print(f"[3] Saved nr audio: {nr_path}", flush=True)
 
-            # ── Step 3: Demucs stem separation ───────────────────────────────
+            # ── Step 4: Demucs stem separation ───────────────────────────────
+            print("[4] Running Demucs…", flush=True)
             other_stem_path = _run_demucs(nr_path, demucs_out_dir)
+            print(f"[4] Demucs done: {other_stem_path}", flush=True)
 
-            # ── Step 4: Resample to 16 kHz mono ──────────────────────────────
-            stem_audio, stem_sr = librosa.load(str(other_stem_path), sr=TARGET_SR, mono=True)
+            # ── Step 5: Resample to 16 kHz mono and encode ───────────────────
+            print("[5] Resampling and encoding…", flush=True)
+            stem_waveform, stem_sr = torchaudio.load(str(other_stem_path))
+            if stem_sr != TARGET_SR:
+                stem_waveform = TAF.resample(stem_waveform, stem_sr, TARGET_SR)
+            stem_mono = stem_waveform.mean(dim=0, keepdim=True)  # (1, T)
 
-            wav_buffer = io.BytesIO()
-            sf.write(wav_buffer, stem_audio, TARGET_SR, format="WAV", subtype="PCM_16")
-            wav_bytes = wav_buffer.getvalue()
+            out_wav = os.path.join(tmpdir, "output.wav")
+            torchaudio.save(out_wav, stem_mono, TARGET_SR, encoding="PCM_S", bits_per_sample=16)
+            with open(out_wav, "rb") as f:
+                wav_bytes = f.read()
+            print(f"[5] Output WAV: {len(wav_bytes)} bytes", flush=True)
 
         stem_b64 = base64.b64encode(wav_bytes).decode("utf-8")
+        print("[OK] Returning result.", flush=True)
         return {"stem_b64": stem_b64, "mime": "audio/wav"}
 
     except HTTPException:
         raise
     except Exception as exc:
-        import traceback
         print(f"ERROR in process_url: {exc}\n{traceback.format_exc()}", flush=True)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
