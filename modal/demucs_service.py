@@ -119,7 +119,9 @@ def _run_demucs(input_wav: str, out_dir: str) -> Path:
         "--out", out_dir,
         input_wav,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
+    env = os.environ.copy()
+    env["TORCH_HOME"] = "/opt/demucs_cache"
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=240, env=env)
     if result.returncode != 0:
         # Use the tail of stderr (progress bars fill the head; errors are at the end).
         # Include stdout too in case Demucs printed the error there.
