@@ -51,13 +51,14 @@ image = (
         "scipy>=1.10.0",
         "torch>=2.1.0",
         "torchaudio>=2.1.0",
+        "torchcodec>=0.1",  # required by torchaudio>=2.5 as default audio backend
         "requests>=2.31.0",
     )
     # Pre-download the Demucs model weights into /opt/demucs_cache so they are
     # baked into the image layer and never fetched at request time.
     # MODAL_BUILD_DATE is a cache-busting sentinel — change it to force a full
     # image rebuild (e.g. after removing packages like librosa/soundfile).
-    .env({"TORCH_HOME": "/opt/demucs_cache", "MODAL_BUILD_DATE": "2026-03-06"})
+    .env({"TORCH_HOME": "/opt/demucs_cache", "MODAL_BUILD_DATE": "2026-03-06b"})
     .run_commands(
         "TORCH_HOME=/opt/demucs_cache python -c "
         "\"from demucs.pretrained import get_model; get_model('htdemucs_ft')\""
