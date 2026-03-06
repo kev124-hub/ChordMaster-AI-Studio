@@ -251,8 +251,14 @@ exports.analyzeTrack = (0, https_1.onCall)({
         let youtubeUrl = url;
         if (platform === "spotify") {
             await jobRef.update({ stage: "resolving", pct: 10 });
-            const isrc = await (0, spotifyLookup_1.resolveSpotifyUrl)(url, exports.spotifyClientId.value(), exports.spotifyClientSecret.value());
-            const ytUrl = await searchYoutube(isrc ? `isrc:${isrc}` : url, exports.youtubeDataApiKey.value());
+            const spotifyDetails = await (0, spotifyLookup_1.resolveSpotifyUrl)(url, exports.spotifyClientId.value(), exports.spotifyClientSecret.value());
+            // Prefer ISRC (exact match); fall back to title + artist text search
+            const searchQuery = spotifyDetails?.isrc
+                ? `isrc:${spotifyDetails.isrc}`
+                : spotifyDetails?.trackName && spotifyDetails?.artistName
+                    ? `${spotifyDetails.trackName} ${spotifyDetails.artistName} official`
+                    : url;
+            const ytUrl = await searchYoutube(searchQuery, exports.youtubeDataApiKey.value());
             if (!ytUrl) {
                 throw new https_1.HttpsError("not-found", "Could not find a YouTube video for this Spotify track.");
             }
@@ -293,7 +299,7 @@ exports.analyzeTrack = (0, https_1.onCall)({
 });
 // ── identifySong ──────────────────────────────────────────────────────────────
 exports.identifySong = (0, https_1.onCall)({
-    secrets: [exports.geminiKey],
+    secrets: [exports.geminiKey, exports.spotifyClientId, exports.spotifyClientSecret],
     memory: "512MiB",
     timeoutSeconds: 120,
     region: "us-central1",
@@ -304,8 +310,33 @@ exports.identifySong = (0, https_1.onCall)({
     const { url } = request.data;
     if (!url)
         throw new https_1.HttpsError("invalid-argument", "url is required.");
-    const genAI = new genai_1.GoogleGenAI({ apiKey: exports.geminiKey.value() });
     console.log(`identifySong called for url: ${url}`);
+    // ── Direct API lookups (more reliable than Gemini search for streaming URLs) ─
+    const platform = detectPlatform(url);
+    if (platform === "apple") {
+        try {
+            const details = await (0, appleLookup_1.getAppleTrackDetails)(url);
+            if (details) {
+                return { title: details.trackName, artist: details.artistName, chords: [], fingerings: [] };
+            }
+        }
+        catch {
+            // Fall through to Gemini
+        }
+    }
+    if (platform === "spotify") {
+        try {
+            const details = await (0, spotifyLookup_1.resolveSpotifyUrl)(url, exports.spotifyClientId.value(), exports.spotifyClientSecret.value());
+            if (details?.trackName && details?.artistName) {
+                return { title: details.trackName, artist: details.artistName, chords: [], fingerings: [] };
+            }
+        }
+        catch {
+            // Fall through to Gemini
+        }
+    }
+    // ── Gemini + Google Search fallback (YouTube and unknown platforms) ────────
+    const genAI = new genai_1.GoogleGenAI({ apiKey: exports.geminiKey.value() });
     try {
         const result = await genAI.models.generateContent({
             model: MODEL,

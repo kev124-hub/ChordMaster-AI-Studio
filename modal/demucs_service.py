@@ -38,7 +38,7 @@ from pydantic import BaseModel
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("ffmpeg")
+    .apt_install("ffmpeg", "libsndfile1")
     .pip_install(
         "fastapi[standard]>=0.115.0",
         "yt-dlp>=2024.1.0",
@@ -51,10 +51,12 @@ image = (
         "torchaudio>=2.1.0",
         "requests>=2.31.0",
     )
-    # Pre-download the Demucs model weights into the image so cold starts
-    # don't need to fetch ~200 MB at request time (which can cause timeouts).
+    # Pre-download the Demucs model weights into /opt/demucs_cache so they are
+    # baked into the image layer and never fetched at request time.
+    .env({"TORCH_HOME": "/opt/demucs_cache"})
     .run_commands(
-        "python -c \"from demucs.pretrained import get_model; get_model('htdemucs_ft')\""
+        "TORCH_HOME=/opt/demucs_cache python -c "
+        "\"from demucs.pretrained import get_model; get_model('htdemucs_ft')\""
     )
 )
 
@@ -117,9 +119,12 @@ def _run_demucs(input_wav: str, out_dir: str) -> Path:
         "--out", out_dir,
         input_wav,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=150)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
     if result.returncode != 0:
-        raise RuntimeError(f"Demucs failed: {result.stderr[:500]}")
+        # Use the tail of stderr (progress bars fill the head; errors are at the end).
+        # Include stdout too in case Demucs printed the error there.
+        tail = (result.stderr + result.stdout)[-3000:]
+        raise RuntimeError(f"Demucs failed (rc={result.returncode}): {tail}")
 
     # Find the output file: {out_dir}/{model}/{stem_name}/no_vocals.wav
     input_stem = Path(input_wav).stem
@@ -138,7 +143,7 @@ def _run_demucs(input_wav: str, out_dir: str) -> Path:
 
 @app.function(
     gpu="A10G",
-    timeout=180,
+    timeout=300,
     memory=8192,
 )
 @modal.fastapi_endpoint(method="POST")

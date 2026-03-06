@@ -64,11 +64,13 @@ async function callModal(audioUrl: string): Promise<string> {
       { url: audioUrl },
       {
         headers: { "Content-Type": "application/json" },
-        timeout: 180000, // 3 min for Demucs
+        timeout: 270_000, // 4.5 min — must be less than the 300 s Firebase function timeout
       }
     );
   } catch (err: any) {
     const status = err?.response?.status;
+    const detail = err?.response?.data?.detail ?? err?.message ?? String(err);
+    console.error(`callModal error [status=${status ?? "no-response"}]:`, detail);
     throw new Error(
       status
         ? `Audio processing service error (${status}). The Modal service may be offline — redeploy it and try again.`

@@ -20,12 +20,8 @@ async function getSpotifyToken(clientId, clientSecret) {
     return resp.data.access_token;
 }
 /**
- * Given a Spotify track URL, return the track's ISRC code.
+ * Given a Spotify track URL, return the track's ISRC, title, and artist.
  * Returns null if it cannot be resolved (e.g. playlist/album URLs).
- *
- * Supported URL patterns:
- *   https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC
- *   https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=...
  */
 async function resolveSpotifyUrl(url, clientId, clientSecret) {
     // Extract track ID
@@ -38,7 +34,10 @@ async function resolveSpotifyUrl(url, clientId, clientSecret) {
         headers: { Authorization: `Bearer ${token}` },
         timeout: 10000,
     });
-    const isrc = resp.data?.external_ids?.isrc;
-    return isrc ?? null;
+    return {
+        isrc: resp.data?.external_ids?.isrc ?? null,
+        trackName: resp.data?.name ?? "",
+        artistName: resp.data?.artists?.[0]?.name ?? "",
+    };
 }
 //# sourceMappingURL=spotifyLookup.js.map

@@ -30,11 +30,21 @@ async function getSpotifyToken(
  *   https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC
  *   https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=...
  */
+export interface SpotifyTrackDetails {
+  isrc: string | null;
+  trackName: string;
+  artistName: string;
+}
+
+/**
+ * Given a Spotify track URL, return the track's ISRC, title, and artist.
+ * Returns null if it cannot be resolved (e.g. playlist/album URLs).
+ */
 export async function resolveSpotifyUrl(
   url: string,
   clientId: string,
   clientSecret: string
-): Promise<string | null> {
+): Promise<SpotifyTrackDetails | null> {
   // Extract track ID
   const match = url.match(/spotify\.com\/track\/([A-Za-z0-9]+)/);
   if (!match) return null;
@@ -49,7 +59,9 @@ export async function resolveSpotifyUrl(
     }
   );
 
-  const isrc: string | undefined =
-    resp.data?.external_ids?.isrc;
-  return isrc ?? null;
+  return {
+    isrc: resp.data?.external_ids?.isrc ?? null,
+    trackName: resp.data?.name ?? "",
+    artistName: resp.data?.artists?.[0]?.name ?? "",
+  };
 }
