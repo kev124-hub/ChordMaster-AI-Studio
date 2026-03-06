@@ -30,7 +30,10 @@ from pathlib import Path
 from typing import Any
 
 import modal
-from pydantic import BaseModel
+try:
+    from pydantic import BaseModel
+except ImportError:  # local env may not have pydantic; container always does
+    BaseModel = object  # type: ignore[assignment,misc]
 
 # ── Image ─────────────────────────────────────────────────────────────────────
 # Build the container image with all required Python packages and system tools.
