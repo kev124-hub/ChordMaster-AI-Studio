@@ -47,7 +47,7 @@ image = (
         "demucs>=4.0.0",
         "noisereduce>=3.0.0",
         "librosa>=0.10.0",
-        "soundfile>=0.12.0",
+        "soundfile==0.12.1",  # 0.13+ uses cffi which breaks with cffi>=2.0
         "numpy>=1.24.0",
         "torch>=2.1.0",
         "torchaudio>=2.1.0",
@@ -76,20 +76,29 @@ DEMUCS_MODEL = "htdemucs_ft"  # Fine-tuned hybrid transformer — best quality
 
 # ── Helper: download audio ────────────────────────────────────────────────────
 
-def _download_yt(url: str, out_path: str) -> None:
-    """Download audio from a YouTube URL using yt-dlp."""
+def _download_yt(url: str, out_path: str) -> str:
+    """Download audio from a YouTube URL using yt-dlp. Returns actual output path."""
+    # Use a template without extension; yt-dlp will append the correct one after
+    # format conversion. We then glob for the resulting file.
+    out_dir = str(Path(out_path).parent)
+    template = os.path.join(out_dir, "yt_audio.%(ext)s")
     cmd = [
         "yt-dlp",
         "--no-playlist",
         "--extract-audio",
         "--audio-format", "wav",
         "--audio-quality", "0",
-        "--output", out_path,
+        "--output", template,
         url,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
         raise RuntimeError(f"yt-dlp failed: {result.stderr[:500]}")
+    # Find what yt-dlp actually wrote
+    candidates = list(Path(out_dir).glob("yt_audio.*"))
+    if not candidates:
+        raise RuntimeError("yt-dlp produced no output file")
+    return str(candidates[0])
 
 
 def _download_signed(url: str, out_path: str) -> None:
@@ -174,7 +183,7 @@ def process_url(body: ProcessBody) -> dict[str, Any]:
 
             # ── Step 1: Download ─────────────────────────────────────────────
             if _is_youtube_url(url):
-                _download_yt(url, raw_audio_path)
+                raw_audio_path = _download_yt(url, raw_audio_path)
             else:
                 _download_signed(url, raw_audio_path)
 
@@ -211,4 +220,6 @@ def process_url(body: ProcessBody) -> dict[str, Any]:
     except HTTPException:
         raise
     except Exception as exc:
+        import traceback
+        print(f"ERROR in process_url: {exc}\n{traceback.format_exc()}", flush=True)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
